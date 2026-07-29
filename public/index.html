@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Riff — Sprich. Es steht schon da.</title>
+<meta name="description" content="Riff verwandelt Sprache in sauberen, korrekt formatierten Text — schneller als du tippen könntest. Shortcut halten oder doppelt antippen, sprechen, loslassen. Limitierter Erstzugang: 100 Plätze. Code einlösen und sofort starten." />
+<meta property="og:title" content="Riff — Sprich. Es steht schon da." />
+<meta property="og:description" content="Spracherkennung, die schneller ist als Tippen — mit besserer Rechtschreibung obendrauf. Limitiert auf 100 Erstzugänge — löse deinen Code ein." />
+<meta property="og:type" content="website" />
+<meta name="theme-color" content="#0a0a0c" />
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<a class="skip-link" href="#einloesen">Direkt zum Code-Einlösen</a>
+
+<!-- ═══════════════ NAV ═══════════════ -->
+<header class="nav" id="nav">
+  <div class="nav-inner">
+    <a class="nav-logo" href="#top" aria-label="Riff — Startseite">
+      <span class="nav-orb" aria-hidden="true"></span>
+      <span class="nav-name">Riff</span>
+    </a>
+    <nav class="nav-links" aria-label="Hauptnavigation">
+      <a href="#produkt">Produkt</a>
+      <a href="#funktionen">Funktionen</a>
+      <a href="#ablauf">Ablauf</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <a class="btn btn-glass btn-nav" href="#einloesen">Code einlösen</a>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- ═══════════════ HERO — Liquid Metal ═══════════════ -->
+  <section class="hero" aria-labelledby="hero-title">
+    <canvas id="metal" class="hero-metal" aria-hidden="true"></canvas>
+    <div class="hero-vignette" aria-hidden="true"></div>
+
+    <div class="hero-content reveal">
+      <p class="hero-badge">
+        <span class="badge-dot" aria-hidden="true"></span>
+        Limitierter Erstzugang&nbsp;·&nbsp;100&nbsp;Plätze
+      </p>
+
+      <h1 class="hero-title" id="hero-title">
+        Sprich.<br />Es steht schon da.
+      </h1>
+
+      <p class="hero-sub">
+        Riff verwandelt Sprache in sauberen, korrekt formatierten Text —
+        schneller als du tippen könntest.
+        <strong>Shortcut halten oder doppelt antippen, sprechen, loslassen.</strong>
+      </p>
+
+      <div class="hero-ctas">
+        <a class="btn btn-glass btn-primary" href="#einloesen">
+          <span>Code einlösen</span>
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </a>
+        <a class="btn btn-ghost" href="#produkt">Riff entdecken</a>
+      </div>
+
+      <ul class="hero-ticks" aria-label="Kernpunkte">
+        <li>5× schneller als Tippen</li>
+        <li>Bessere Rechtschreibung inklusive</li>
+        <li>Einmal zahlen, deins</li>
+      </ul>
+
+      <!-- Live-Zähler: wird nur angezeigt, wenn der echte Einlösestand
+           geladen werden konnte. Keine erfundene Knappheit. -->
+      <div class="scarcity" id="scarcity" hidden>
+        <div class="scarcity-bar" aria-hidden="true"><div class="scarcity-fill" id="scarcity-fill"></div></div>
+        <p class="scarcity-text"><span id="scarcity-count">–</span> von <span id="scarcity-total">100</span> Plätzen vergeben</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ PRODUKT-SHOWCASE — echte Riff-UI ═══════════════ -->
+  <section class="tile tile-dark" id="produkt" aria-labelledby="produkt-title">
+    <div class="tile-inner">
+      <h2 class="tile-title reveal" id="produkt-title">Eine kleine Pille.<br />Strg&nbsp;+&nbsp;Alt&nbsp;halten.</h2>
+      <p class="tile-lead reveal">
+        Riff legt sich als winzige, schwebende Bubble unten in die Mitte deines
+        Bildschirms — hört zu, verarbeitet, pastet. Und verschwindet wieder.
+      </p>
+
+      <!-- Nachbau der echten Riff-Bubble (Waveform + Haken/Kreuz im
+           Freihand-Modus) -->
+      <div class="mockup reveal" role="img" aria-label="Riff-Bubble: schwebende Aufnahme-Pille mit Waveform und im Freihand-Modus zwei winzigen Icons zum Bestätigen oder Verwerfen per Maus">
+        <div class="mockup-desktop" aria-hidden="true">
+          <div class="mock-window mock-window-a"><span class="mock-dot"></span><span class="mock-dot"></span><span class="mock-dot"></span></div>
+          <div class="mock-window mock-window-b"></div>
+        </div>
+        <div class="mockup-overlay" aria-hidden="true">
+          <div class="mock-panel">
+            <p class="mock-msg mock-user">„…und dann schicken wir das Angebot noch heute raus, neuer Absatz, Grüße Jayden"</p>
+            <p class="mock-msg mock-ai">…und dann schicken wir das Angebot noch heute raus.<br />Grüße<br />Jayden</p>
+            <div class="mock-action">
+              <span class="mock-action-icon">⚡</span>
+              <span class="mock-action-text">Bereinigt eingefügt — 0,6s</span>
+              <span class="mock-action-hint">Strg+Alt halten&nbsp;·&nbsp;oder 2× tippen</span>
+            </div>
+          </div>
+          <div class="mock-bar">
+            <span class="mock-orb"></span>
+            <span class="mock-input">●●●●●●●●●●●●<span class="mock-caret"></span></span>
+            <span class="mock-trust">🔒 dein API-Key</span>
+          </div>
+        </div>
+      </div>
+
+      <p class="mockup-caption reveal">
+        Füllwörter, Versprecher, Zeichensetzung — automatisch bereinigt.
+        <em>Deine</em> Wörter, nicht umformuliert.
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══════════════ FUNKTIONEN ═══════════════ -->
+  <section class="tile tile-deep" id="funktionen" aria-labelledby="funktionen-title">
+    <div class="tile-inner">
+      <h2 class="tile-title reveal" id="funktionen-title">Gebaut für einen Job.<br />Richtig gut gemacht.</h2>
+      <div class="features">
+        <article class="feature glass reveal">
+          <h3>Zwei Modi, ein Diktat</h3>
+          <p>Modus A: Shortcut halten, sprechen, loslassen. Modus B: zweimal antippen zum Start, zweimal antippen oder Haken/Kreuz-Klick zum Beenden. Beide frei belegbar.</p>
+        </article>
+        <article class="feature glass reveal">
+          <h3>Ein Paste, kein Getippe</h3>
+          <p>Dein bereinigter Text erscheint per Zwischenablage an der Cursor-Position — unabhängig von der Länge sofort da, egal in welcher App.</p>
+        </article>
+        <article class="feature glass reveal">
+          <h3>Bereinigt, nicht umgeschrieben</h3>
+          <p>Füllwörter, Versprecher, doppelte Wörter raus. Zeichensetzung und Großschreibung korrigiert. Fachbegriffe, Zahlen, Namen und deine Sprache bleiben exakt erhalten.</p>
+        </article>
+        <article class="feature glass reveal">
+          <h3>Sprachbefehle</h3>
+          <p>„Neuer Absatz", „Komma", „Klammer auf" — Formatierung per Zuruf, auf Deutsch und Englisch. „Letzten Satz löschen" macht Diktierfehler ungeschehen.</p>
+        </article>
+        <article class="feature glass reveal">
+          <h3>Nie im Weg</h3>
+          <p>Die Bubble ist click-through und folgt deiner Taskbar, egal wo sie sitzt. Sie stiehlt nie den Fokus — deine Zielanwendung bleibt aktiv.</p>
+        </article>
+        <article class="feature glass reveal">
+          <h3>Dein API-Key, dein Tempo</h3>
+          <p>Spracherkennung und Bereinigung laufen über bewusst günstige, schnelle Modelle. Kein Vendor-Lock-in — der Key bleibt lokal auf deinem PC.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ TEAM ═══════════════ -->
+  <section class="tile tile-dark" id="team" aria-labelledby="team-title">
+    <div class="tile-inner">
+      <h2 class="tile-title reveal" id="team-title">Gebaut von zwei aus Liechtenstein.</h2>
+      <div class="features features-2">
+        <article class="feature glass reveal">
+          <h3>Jayden Mikus</h3>
+          <p>Gründer &amp; Entwicklung. Baut Riff von Grund auf selbst — Diktier-Engine, Bubble und native Tasteninjektion. Daneben Video-Editor (YouTube&nbsp;@subspeedy, 1M+&nbsp;Aufrufe), Gründer der Automatisierungsagentur HaloVision&nbsp;AI und Entwickler von Sable, dem KI-Agenten.</p>
+        </article>
+        <article class="feature glass reveal">
+          <h3>Aron Nägele</h3>
+          <p>Mitgründer, Marketing &amp; Erfinder. Verantwortet Positionierung und Markenauftritt und bringt als Tüftler eigene Produktideen ein.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ ABLAUF ═══════════════ -->
+  <section class="tile tile-dark" id="ablauf" aria-labelledby="ablauf-title">
+    <div class="tile-inner">
+      <h2 class="tile-title reveal" id="ablauf-title">In drei Minuten startklar.</h2>
+      <ol class="steps">
+        <li class="step glass reveal">
+          <span class="step-num" aria-hidden="true">1</span>
+          <h3>Code einlösen</h3>
+          <p>Deinen Zugangscode unten eingeben. Er ist genau einmal gültig — und danach fest deiner.</p>
+        </li>
+        <li class="step glass reveal">
+          <span class="step-num" aria-hidden="true">2</span>
+          <h3>Herunterladen</h3>
+          <p>Der Download-Link erscheint sofort nach der Einlösung, zusammen mit deiner Beleg-ID.</p>
+        </li>
+        <li class="step glass reveal">
+          <span class="step-num" aria-hidden="true">3</span>
+          <h3>Strg + Alt halten</h3>
+          <p>Riff starten, API-Key eintragen, Hotkey drücken, sprechen. Kein Konto, keine Anmeldung, kein Warten.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ═══════════════ CODE EINLÖSEN ═══════════════ -->
+  <section class="redeem" id="einloesen" aria-labelledby="redeem-title">
+    <div class="redeem-glow" aria-hidden="true"></div>
+    <div class="redeem-card glass-strong reveal">
+
+      <!-- Formular-Zustand -->
+      <div class="redeem-form-state" id="redeem-form-state">
+        <h2 class="redeem-title" id="redeem-title">Löse deinen Code ein.</h2>
+        <p class="redeem-sub">Einer von 100. Danach gehört Riff dir.</p>
+
+        <form id="redeem-form" novalidate>
+          <label class="redeem-label" for="code-input">Dein Zugangscode</label>
+          <div class="redeem-row">
+            <input
+              id="code-input"
+              name="code"
+              type="text"
+              inputmode="latin"
+              autocomplete="off"
+              autocapitalize="characters"
+              spellcheck="false"
+              maxlength="20"
+              placeholder="RIFF-XXXX-XXXX-XXXX"
+              aria-describedby="redeem-hint redeem-error"
+            />
+            <button class="btn btn-glass btn-primary" type="submit" id="redeem-btn">
+              <span id="redeem-btn-label">Einlösen</span>
+            </button>
+          </div>
+          <p class="redeem-hint" id="redeem-hint">
+            Bindestriche setzen wir automatisch. Verwechselbare Zeichen (0/O,&nbsp;1/I) kommen in Codes nicht vor.
+          </p>
+          <p class="redeem-error" id="redeem-error" role="alert" hidden></p>
+        </form>
+
+        <p class="redeem-privacy">
+          🔒 Deine Eingabe wird verschlüsselt übertragen, nur zur Prüfung verwendet
+          und nicht mit Werbe- oder Analysediensten geteilt.
+        </p>
+      </div>
+
+      <!-- Erfolgs-Zustand (Delight Moment) -->
+      <div class="redeem-success-state" id="redeem-success-state" hidden>
+        <div class="success-orb" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <h2 class="redeem-title">Willkommen bei Riff.</h2>
+        <p class="redeem-sub">Platz <span id="success-slot">–</span> von 100 ist jetzt deiner.</p>
+        <p class="success-receipt">Beleg-ID: <code id="success-receipt-id">–</code> — bitte aufbewahren.</p>
+        <div class="success-delivery" id="success-delivery"></div>
+        <ol class="success-steps" id="success-steps"></ol>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════ FAQ ═══════════════ -->
+  <section class="tile tile-deep" id="faq" aria-labelledby="faq-title">
+    <div class="tile-inner tile-narrow">
+      <h2 class="tile-title reveal" id="faq-title">Fragen, ehrlich beantwortet.</h2>
+
+      <details class="faq-item glass reveal">
+        <summary>Was brauche ich, um Riff zu nutzen?</summary>
+        <p>Einen Windows-PC (Windows 10/11) und ein Mikrofon — das eingebaute Notebook-Mikro reicht. Spracherkennung und Bereinigung laufen über einen eigenen OpenRouter-API-Key, den du nach der Installation in den Einstellungen einträgst.</p>
+      </details>
+      <details class="faq-item glass reveal">
+        <summary>Was passiert nach der Code-Einlösung?</summary>
+        <p>Du bekommst sofort den Download-Link und eine Beleg-ID. Kein Konto, keine E-Mail-Pflicht. Die Beleg-ID ist dein Nachweis, falls du später Support brauchst.</p>
+      </details>
+      <details class="faq-item glass reveal">
+        <summary>Kostet die Nutzung selbst noch etwas?</summary>
+        <p>Der Code schaltet Riff frei. Spracherkennung und Bereinigung laufen über deinen eigenen API-Key — die Kosten pro Diktat sind gering (Cent-Bereich), du siehst und kontrollierst sie direkt bei deinem Modell-Anbieter.</p>
+      </details>
+      <details class="faq-item glass reveal">
+        <summary>Mein Code funktioniert nicht — was nun?</summary>
+        <p>Prüfe zuerst Tippfehler (Codes enthalten nie 0, O, 1 oder I). Wird der Code als „bereits eingelöst" gemeldet, obwohl du ihn nie benutzt hast, melde dich mit deinem Kaufnachweis — jede Einlösung ist bei uns auditierbar, wir finden das heraus.</p>
+      </details>
+    </div>
+  </section>
+
+</main>
+
+<!-- ═══════════════ FOOTER ═══════════════ -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <span class="nav-orb" aria-hidden="true"></span>
+      <span>Riff</span>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="#produkt">Produkt</a>
+      <a href="#einloesen">Code einlösen</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <p class="footer-fine">
+      Limitierter Erstzugang: 100 Plätze, live gezählt.
+      Diese Seite verwendet keine Cookies und keine Tracker.
+      <!-- TODO vor Launch: Impressum & Datenschutzerklärung verlinken -->
+    </p>
+  </div>
+</footer>
+
+<script src="app.js" defer></script>
+</body>
+</html>

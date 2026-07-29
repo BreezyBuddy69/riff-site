@@ -1,0 +1,45 @@
+services:
+  riff:
+    build: .
+    container_name: riff
+    restart: unless-stopped
+    networks:
+      - traefik-proxy
+    env_file:
+      # optional: falls keine .env auf dem Host liegt, startet der Container
+      # trotzdem (App läuft dann im Demo-Modus, siehe server/index.js).
+      - path: .env
+        required: false
+    environment:
+      - DATA_DIR=/data
+    volumes:
+      # SQLite = Source of Truth der Einlösungen. Dieses Volume ist heilig:
+      # geht es verloren, zählt nur noch der (nachlaufende) Sheet-Spiegel.
+      - riff_data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.riff.rule=Host(`halovisionai.cloud`) && PathPrefix(`/riff`)
+      - traefik.http.routers.riff.entrypoints=websecure
+      - traefik.http.routers.riff.tls.certresolver=letsencrypt
+      # Bare "/riff" (ohne trailing slash) zuerst auf "/riff/" umleiten:
+      # index.html referenziert CSS/JS/API relativ, das geht nur mit korrektem
+      # Verzeichnis-Pfad in der Adressleiste.
+      - traefik.http.middlewares.riff-redirect.redirectregex.regex=^(https?://[^/]+)/riff$$
+      - traefik.http.middlewares.riff-redirect.redirectregex.replacement=$${1}/riff/
+      - traefik.http.middlewares.riff-redirect.redirectregex.permanent=true
+      - traefik.http.middlewares.riff-strip.stripprefix.prefixes=/riff
+      - traefik.http.routers.riff.middlewares=riff-redirect,riff-strip
+      - traefik.http.services.riff.loadbalancer.server.port=8080
+
+networks:
+  traefik-proxy:
+    external: true
+
+volumes:
+  riff_data:

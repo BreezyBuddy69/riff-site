@@ -1,0 +1,10 @@
+# Secrets & lokale Daten — niemals committen
+.env
+data/
+service-account*.json
+server/seed-codes.local.js
+
+# Release-Binary (~80MB) — nicht ins Repo, separat aufs VPS bringen (scp)
+# oder per RIFF_DOWNLOAD_URL auf eine externe Ablage zeigen.
+public/downloads/*.zip
+public/downloads/*.exe
