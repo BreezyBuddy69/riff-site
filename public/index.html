@@ -35,9 +35,17 @@
 
 <main id="top">
 
-  <!-- ═══════════════ HERO — Liquid Metal ═══════════════ -->
+  <!-- ═══════════════ HERO — Liquid Metal + Bubbles ═══════════════ -->
   <section class="hero" aria-labelledby="hero-title">
     <canvas id="metal" class="hero-metal" aria-hidden="true"></canvas>
+    <!-- Schwebende Glow-Bubbles: eigenes Motiv, keine Deko von der Stange -
+         Skalierung des vorhandenen Orb-Markenzeichens (.nav-orb/.mock-orb),
+         das jetzt schon an zwei anderen Stellen der Seite auftaucht. -->
+    <div class="hero-bubbles" aria-hidden="true">
+      <span class="bubble bubble-1"></span>
+      <span class="bubble bubble-2"></span>
+      <span class="bubble bubble-3"></span>
+    </div>
     <div class="hero-vignette" aria-hidden="true"></div>
 
     <div class="hero-content reveal">
@@ -50,11 +58,7 @@
         Sprich.<br />Es steht schon da.
       </h1>
 
-      <p class="hero-sub">
-        Riff verwandelt Sprache in sauberen, korrekt formatierten Text —
-        schneller als du tippen könntest.
-        <strong>Shortcut halten oder doppelt antippen, sprechen, loslassen.</strong>
-      </p>
+      <p class="hero-sub">Schneller als Tippen. Bessere Rechtschreibung inklusive.</p>
 
       <div class="hero-ctas">
         <a class="btn btn-glass btn-primary" href="#einloesen">
@@ -63,12 +67,6 @@
         </a>
         <a class="btn btn-ghost" href="#produkt">Riff entdecken</a>
       </div>
-
-      <ul class="hero-ticks" aria-label="Kernpunkte">
-        <li>5× schneller als Tippen</li>
-        <li>Bessere Rechtschreibung inklusive</li>
-        <li>Einmal zahlen, deins</li>
-      </ul>
 
       <!-- Live-Zähler: wird nur angezeigt, wenn der echte Einlösestand
            geladen werden konnte. Keine erfundene Knappheit. -->
@@ -79,37 +77,28 @@
     </div>
   </section>
 
-  <!-- ═══════════════ PRODUKT-SHOWCASE — echte Riff-UI ═══════════════ -->
+  <!-- ═══════════════ PRODUKT-SHOWCASE — Live-Demo-Loop ═══════════════ -->
   <section class="tile tile-dark" id="produkt" aria-labelledby="produkt-title">
     <div class="tile-inner">
       <h2 class="tile-title reveal" id="produkt-title">Eine kleine Pille.<br />Strg&nbsp;+&nbsp;Alt&nbsp;halten.</h2>
-      <p class="tile-lead reveal">
-        Riff legt sich als winzige, schwebende Bubble unten in die Mitte deines
-        Bildschirms — hört zu, verarbeitet, pastet. Und verschwindet wieder.
-      </p>
 
-      <!-- Nachbau der echten Riff-Bubble (Waveform + Haken/Kreuz im
-           Freihand-Modus) -->
-      <div class="mockup reveal" role="img" aria-label="Riff-Bubble: schwebende Aufnahme-Pille mit Waveform und im Freihand-Modus zwei winzigen Icons zum Bestätigen oder Verwerfen per Maus">
-        <div class="mockup-desktop" aria-hidden="true">
-          <div class="mock-window mock-window-a"><span class="mock-dot"></span><span class="mock-dot"></span><span class="mock-dot"></span></div>
-          <div class="mock-window mock-window-b"></div>
+      <!-- Endlos-Loop: Bubble faehrt hoch, hoert zu, Text erscheint, Bubble
+           faehrt wieder runter - reines CSS (@keyframes), respektiert
+           prefers-reduced-motion automatisch ueber die globale Regel am
+           Dateiende. Kein Screenshot-Nachbau mehr, sondern der tatsaechliche
+           Bewegungsablauf der echten App. -->
+      <div class="demo-stage reveal" role="img" aria-label="Animierte Demo: die Riff-Bubble fährt von unten hoch, hört zu, der erkannte Text erscheint darüber, dann fährt die Bubble wieder herunter — Endlosschleife">
+        <div class="demo-desktop" aria-hidden="true">
+          <div class="demo-window demo-window-a"><span class="mock-dot"></span><span class="mock-dot"></span><span class="mock-dot"></span></div>
+          <div class="demo-window demo-window-b"></div>
         </div>
-        <div class="mockup-overlay" aria-hidden="true">
-          <div class="mock-panel">
-            <p class="mock-msg mock-user">„…und dann schicken wir das Angebot noch heute raus, neuer Absatz, Grüße Jayden"</p>
-            <p class="mock-msg mock-ai">…und dann schicken wir das Angebot noch heute raus.<br />Grüße<br />Jayden</p>
-            <div class="mock-action">
-              <span class="mock-action-icon">⚡</span>
-              <span class="mock-action-text">Bereinigt eingefügt — 0,6s</span>
-              <span class="mock-action-hint">Strg+Alt halten&nbsp;·&nbsp;oder 2× tippen</span>
-            </div>
-          </div>
-          <div class="mock-bar">
-            <span class="mock-orb"></span>
-            <span class="mock-input">●●●●●●●●●●●●<span class="mock-caret"></span></span>
-            <span class="mock-trust">🔒 dein API-Key</span>
-          </div>
+        <div class="demo-text" aria-hidden="true">
+          <span class="demo-text-line">„…und dann schicken wir das Angebot noch heute raus."</span>
+        </div>
+        <div class="demo-bubble" aria-hidden="true">
+          <span class="demo-bar"></span><span class="demo-bar"></span><span class="demo-bar"></span>
+          <span class="demo-bar"></span><span class="demo-bar"></span><span class="demo-bar"></span>
+          <span class="demo-bar"></span><span class="demo-bar"></span>
         </div>
       </div>
 
@@ -265,7 +254,11 @@
       </details>
       <details class="faq-item glass reveal">
         <summary>Kostet die Nutzung selbst noch etwas?</summary>
-        <p>Der Code schaltet Riff frei. Spracherkennung und Bereinigung laufen über deinen eigenen API-Key — die Kosten pro Diktat sind gering (Cent-Bereich), du siehst und kontrollierst sie direkt bei deinem Modell-Anbieter.</p>
+        <p>Dein Zugangscode schaltet den Download frei. Kostenlos nutzbar bis 1500 Wörter pro Woche — für die meisten reicht das locker. Willst du unbegrenzt diktieren, löst du einen separaten Pro-Code direkt in Riffs Einstellungen ein (nicht hier auf der Website). Spracherkennung und Bereinigung laufen zusätzlich über deinen eigenen API-Key — die Kosten pro Diktat sind gering (Cent-Bereich), du siehst und kontrollierst sie direkt bei deinem Modell-Anbieter.</p>
+      </details>
+      <details class="faq-item glass reveal">
+        <summary>Was ist der Unterschied zwischen Zugangscode und Pro-Code?</summary>
+        <p>Zwei getrennte Codes für zwei Dinge: Der Zugangscode (den du hier unten einlöst) schaltet den Download frei — einer von 100 Plätzen. Der Pro-Code (Format <code>RIFFPRO-XXXX-XXXX-XXXX</code>) hebt das Wochenlimit in der App auf und wird ausschließlich dort eingelöst, in den Einstellungen unter „Konto". Ohne Pro-Code läuft Riff im kostenlosen Modus mit 1500 Wörtern/Woche weiter.</p>
       </details>
       <details class="faq-item glass reveal">
         <summary>Mein Code funktioniert nicht — was nun?</summary>

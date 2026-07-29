@@ -403,13 +403,18 @@ const server = http.createServer(async (req, res) => {
 // .env/Sheets/n8n-Konfiguration — ein "Ordner löschen + neu klonen"-Deploy
 // reicht, die echten 100 Codes sind sofort wieder da.
 
+// Seedet ALLE Produkte in SEED_CODES (nicht nur DEFAULT_PRODUCT) - seit dem
+// zweiten Code-Pool "riff-pro" (Pro-Freischaltung, eingeloest in der App statt
+// auf der Website, siehe products.js) braucht auch der einen lokalen Seed-Pfad.
 function seedCodesIfEmpty() {
   if (sheets.isConfigured()) return;
-  const { total } = getCounts(DEFAULT_PRODUCT);
-  if (total > 0) return;
-  const codes = SEED_CODES[DEFAULT_PRODUCT] || [];
-  for (const code of codes) importCode(code, DEFAULT_PRODUCT, { source: "seed" });
-  console.log(`[seed] ${codes.length} Codes aus server/seed-codes.js importiert (kein Sheets konfiguriert).`);
+  for (const product of Object.keys(SEED_CODES)) {
+    const { total } = getCounts(product);
+    if (total > 0) continue;
+    const codes = SEED_CODES[product] || [];
+    for (const code of codes) importCode(code, product, { source: "seed" });
+    console.log(`[seed] ${codes.length} Codes für "${product}" aus server/seed-codes.js importiert (kein Sheets konfiguriert).`);
+  }
 }
 
 seedCodesIfEmpty();

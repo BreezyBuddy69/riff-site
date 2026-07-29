@@ -23,11 +23,13 @@ const PRODUCTS = {
       id,
       tab: process.env.RIFF_SHEET_TAB || "Codes",
     })),
-    // Anders als bei Sable (Einmalkauf/Permanent-Unlock) schaltet ein Riff-
-    // Code Pro dauerhaft frei, das WOCHENKONTINGENT (1500 Wörter) selbst wird
-    // aber app-/n8n-seitig durchgesetzt (Master-Prompt §6.10/§9), nicht hier
-    // auf der Redemption-Plattform — die kennt nur "eingelöst ja/nein", genau
-    // wie bei Sable.
+    // Dieser Code schaltet NUR den Download frei (Zugang zu den 100
+    // Erstplätzen) - er ist NICHT derselbe Code wie fuer die Pro-Freischaltung
+    // in der App (siehe "riff-pro" unten, Nutzerwunsch 2026-07-29: zwei
+    // getrennte Codes, damit "Download freigeschaltet" und "unbegrenztes
+    // Diktieren" unabhaengig voneinander verkauft/verschenkt werden koennen).
+    // Free-Tier-Wochenkontingent (1500 Woerter) wird app-/n8n-seitig
+    // durchgesetzt (Master-Prompt §6.10/§9), nicht hier.
     //
     // Ohne RIFF_DOWNLOAD_URL wird der lokal mitgelieferte Installer unter
     // /downloads/Riff-Setup.exe ausgeliefert (siehe server/index.js
@@ -43,9 +45,31 @@ const PRODUCTS = {
         "Windows SmartScreen kann beim ersten Start warnen (unsignierte App) — „Weitere Informationen“ → „Trotzdem ausführen“.",
         "Riff startet nach der Installation automatisch und legt eine Verknüpfung im Startmenü an.",
         "Strg + Alt halten und sprechen zum Diktieren — Strg + Alt + D zweimal antippen für den Freihand-Modus.",
-        "In den Einstellungen deinen OpenRouter-API-Key eintragen, dann ist Riff einsatzbereit.",
+        "Kostenlos: 1500 Wörter/Woche. Für unbegrenztes Diktieren einen Pro-Code in den Riff-Einstellungen einlösen.",
       ],
     },
+  },
+  // Zweiter, unabhaengiger Code-Pool fuer die App-interne Pro-Freischaltung
+  // (unbegrenztes Diktieren statt 1500 Woerter/Woche) - eingeloest NICHT auf
+  // dieser Website, sondern direkt in Riffs Settings ("Konto"-Sektion, siehe
+  // Riff/src/main/license.js). Eigener Codepattern-Prefix ("RIFFPRO-" statt
+  // "RIFF-"), damit Zugangs- und Pro-Codes auf den ersten Blick unterscheidbar
+  // sind - genau die Verwechslung, die der Nutzer als Problem beschrieben hat.
+  "riff-pro": {
+    slug: "riff-pro",
+    name: "Riff Pro",
+    tagline: "Unbegrenztes Diktieren.",
+    status: "available",
+    totalSlots: Number(process.env.RIFF_PRO_TOTAL_SLOTS || 0), // 0 = kein Live-Zaehler auf der Website (Pro wird nicht hier beworben)
+    codePattern: /^RIFFPRO-[2-9A-HJKMNP-TV-Z]{4}-[2-9A-HJKMNP-TV-Z]{4}-[2-9A-HJKMNP-TV-Z]{4}$/,
+    codePlaceholder: "RIFFPRO-XXXX-XXXX-XXXX",
+    sheets: envList("RIFF_PRO_SHEET_ID_1").map((id) => ({
+      id,
+      tab: process.env.RIFF_PRO_SHEET_TAB || "Codes",
+    })),
+    // Keine Datei-Auslieferung - die App liest nur "ok:true" und setzt
+    // account.tier = 'pro' lokal (siehe license.js#redeem).
+    delivery: { type: "unlock", url: null, label: null, steps: [] },
   },
 };
 
