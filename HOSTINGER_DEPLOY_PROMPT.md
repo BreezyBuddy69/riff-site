@@ -40,6 +40,21 @@ Without it, the download button 404s but the rest of the site (redemption
 flow, admin) works fine — not a blocker for going live, just do it before
 announcing the download link.
 
+**`server/seed-codes.local.js` is also gitignored (the real, sellable codes
+— never committed, see `server/seed-codes.js`) and is REQUIRED unless Google
+Sheets or the n8n webhook is configured below.** Without it, both code pools
+("riff" and "riff-pro") build empty and every redemption fails with
+"code unknown" even for a real code — this is not a fallback/demo mode, it's
+a broken deploy. Copy it up the same way:
+
+```bash
+scp server/seed-codes.local.js user@vps:riff-site/server/seed-codes.local.js
+```
+
+This only seeds an EMPTY pool (`total === 0` in the DB) — if you redeploy
+after codes already synced from a previous run, this file is ignored and the
+existing `riff_data` volume stays the source of truth.
+
 ---
 
 ## Step 2 — Configure `.env`
@@ -49,13 +64,19 @@ cp .env.example .env
 nano .env   # or vi
 ```
 
-The app **runs without `.env`** too (falls back to a demo mode, see
-`server/index.js`) — but for real redemptions you need at least one of:
+The app **runs without `.env`** too — but for real redemptions you need
+either `server/seed-codes.local.js` present (Step 1, local/offline pool) or
+one of:
 
 - **Google Sheets sync** (`GOOGLE_SERVICE_ACCOUNT_JSON_B64` + `RIFF_SHEET_ID_1`
   + `RIFF_SHEET_ID_2`), or
 - **n8n redeem webhook** (`N8N_REDEEM_WEBHOOK_URL`) — alternative to Sheets,
   if a workflow for this already exists on `n8n.halovisionai.cloud`.
+
+If Sheets credentials ARE set but `RIFF_PRO_SHEET_ID_1` / `RIFF_PRO_TOTAL_SLOTS`
+are not, the "riff-pro" pool silently never syncs (Sheets configured = local
+seed is skipped entirely for every product) — either set those too, or leave
+Sheets unconfigured and rely on `seed-codes.local.js` for both pools.
 
 Also set `ADMIN_TOKEN` (random, e.g. `openssl rand -hex 32`) to unlock
 `GET /api/admin/audit`. Leave `TRUST_PROXY=true` — this runs behind Traefik.
@@ -101,7 +122,13 @@ docker network ls | grep traefik-proxy
 ```bash
 curl -I https://halovisionai.cloud/riff/
 curl https://halovisionai.cloud/riff/healthz
+curl "https://halovisionai.cloud/riff/api/status?product=riff"
+curl "https://halovisionai.cloud/riff/api/status?product=riff-pro"
 ```
+
+Check `"poolLoaded"` in the last two responses — `false` means that product's
+code pool is empty (nobody can redeem anything) even though the server is
+"healthy". This is the actual go-live check, not just `healthz`.
 
 ---
 
