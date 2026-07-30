@@ -29,16 +29,11 @@ git clone https://github.com/BreezyBuddy69/riff-site.git
 cd riff-site
 ```
 
-`public/downloads/Riff-Setup.exe` is gitignored (large binary, same call as
-the other sites' installers) — copy it up separately before building:
-
-```bash
-scp Riff-Setup.exe user@vps:riff-site/public/downloads/
-```
-
-Without it, the download button 404s but the rest of the site (redemption
-flow, admin) works fine — not a blocker for going live, just do it before
-announcing the download link.
+`public/downloads/Riff-Setup.exe` does NOT need to be copied onto the server
+— `server/products.js` defaults the download button to the public GitHub
+Release asset (`releases/download/v1.0.0/Riff-Setup.exe`). Only put a file at
+`public/downloads/Riff-Setup.exe` (gitignored) if you want to self-host it
+instead; otherwise skip straight to the codes below.
 
 **`server/seed-codes.local.js` is also gitignored (the real, sellable codes
 — never committed, see `server/seed-codes.js`) and is REQUIRED unless Google

@@ -31,14 +31,15 @@ const PRODUCTS = {
     // Free-Tier-Wochenkontingent (1500 Woerter) wird app-/n8n-seitig
     // durchgesetzt (Master-Prompt §6.10/§9), nicht hier.
     //
-    // Ohne RIFF_DOWNLOAD_URL wird der lokal mitgelieferte Installer unter
-    // /downloads/Riff-Setup.exe ausgeliefert (siehe server/index.js
-    // handleDownload) - funktioniert ohne jede .env-Konfiguration. Für
-    // Produktion optional auf eine externe Ablage (GitHub Release, CDN)
-    // umleiten, um die VPS-Bandbreite zu schonen (Sable macht das bereits so).
+    // Default zeigt auf den GitHub-Release-Asset-Link statt auf einen lokal
+    // mitgelieferten Installer - die 82-MB-EXE muss so nie manuell aufs VPS
+    // kopiert werden (kein scp/Kodee-Schritt fuer den Download-Teil noetig).
+    // RIFF_DOWNLOAD_URL bleibt als Override fuer eine andere Ablage nutzbar.
     delivery: {
       type: "download",
-      url: process.env.RIFF_DOWNLOAD_URL || "/downloads/Riff-Setup.exe",
+      url:
+        process.env.RIFF_DOWNLOAD_URL ||
+        "https://github.com/BreezyBuddy69/riff-site/releases/download/v1.0.0/Riff-Setup.exe",
       label: "Riff herunterladen",
       steps: [
         "Riff-Setup.exe herunterladen und doppelklicken — installiert sich automatisch, kein Entpacken nötig.",
