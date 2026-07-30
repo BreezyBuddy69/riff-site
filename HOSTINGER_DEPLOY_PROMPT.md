@@ -35,20 +35,18 @@ Release asset (`releases/download/v1.0.0/Riff-Setup.exe`). Only put a file at
 `public/downloads/Riff-Setup.exe` (gitignored) if you want to self-host it
 instead; otherwise skip straight to the codes below.
 
-**`server/seed-codes.local.js` is also gitignored (the real, sellable codes
-— never committed, see `server/seed-codes.js`) and is REQUIRED unless Google
-Sheets or the n8n webhook is configured below.** Without it, both code pools
-("riff" and "riff-pro") build empty and every redemption fails with
-"code unknown" even for a real code — this is not a fallback/demo mode, it's
-a broken deploy. Copy it up the same way:
+`server/seed-codes.local.js` (the real, sellable codes) is committed directly
+in this repo as of 2026-07-31 — it used to be gitignored and had to be copied
+up separately, which was the #1 cause of "poolLoaded: false" / every code
+failing with "unknown" on a fresh deploy. It comes with the `git clone` now,
+nothing extra to do. **Trade-off, deliberately accepted:** this repo is
+public, so these codes are visible to anyone who looks — if they leak/get
+scraped, regenerate a fresh batch the same way as the previous compromise
+(see git history around 2026-07-29).
 
-```bash
-scp server/seed-codes.local.js user@vps:riff-site/server/seed-codes.local.js
-```
-
-This only seeds an EMPTY pool (`total === 0` in the DB) — if you redeploy
-after codes already synced from a previous run, this file is ignored and the
-existing `riff_data` volume stays the source of truth.
+This only seeds an EMPTY pool (`total === 0` in the DB on first boot) — once
+codes have synced into the `riff_data` volume, this file is ignored on
+redeploy and the volume stays the source of truth.
 
 ---
 
