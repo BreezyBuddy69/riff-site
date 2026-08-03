@@ -32,7 +32,8 @@
     "mac": {
       "target": [{ "target": "zip", "arch": ["universal"] }],
       "icon": "assets/icon.png",
-      "identity": null
+      "identity": null,
+      "x64ArchFiles": "Contents/Resources/app/helper/RiffHelperMac"
     },
     "nsis": {
       "oneClick": true,
