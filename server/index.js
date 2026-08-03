@@ -309,9 +309,7 @@ async function handleRedeem(req, res) {
     redeemedAt: result.redeemedAt,
     delivery: {
       type: product.delivery.type,
-      url: product.delivery.url,
-      label: product.delivery.label,
-      steps: product.delivery.steps,
+      platforms: product.delivery.platforms,
     },
     status: productStatus(product.slug),
   });

@@ -32,22 +32,47 @@ const PRODUCTS = {
     // durchgesetzt (Master-Prompt §6.10/§9), nicht hier.
     //
     // Default zeigt auf den GitHub-Release-Asset-Link statt auf einen lokal
-    // mitgelieferten Installer - die 82-MB-EXE muss so nie manuell aufs VPS
+    // mitgelieferten Installer - die Binaries muessen so nie manuell aufs VPS
     // kopiert werden (kein scp/Kodee-Schritt fuer den Download-Teil noetig).
-    // RIFF_DOWNLOAD_URL bleibt als Override fuer eine andere Ablage nutzbar.
+    // Ein Zugangscode schaltet den Download frei, die Plattform waehlt man
+    // danach (win/mac) - RIFF_DOWNLOAD_URL_WIN/_MAC bleiben als Overrides
+    // nutzbar (z.B. eigenes Hosting statt GitHub Releases).
     delivery: {
       type: "download",
-      url:
-        process.env.RIFF_DOWNLOAD_URL ||
-        "https://github.com/BreezyBuddy69/riff-site/releases/download/v1.0.0/Riff-Setup.exe",
-      label: "Riff herunterladen",
-      steps: [
-        "Riff-Setup.exe herunterladen und doppelklicken — installiert sich automatisch, kein Entpacken nötig.",
-        "Windows SmartScreen kann beim ersten Start warnen (unsignierte App) — „Weitere Informationen“ → „Trotzdem ausführen“.",
-        "Riff startet nach der Installation automatisch und legt eine Verknüpfung im Startmenü an.",
-        "Strg + Alt halten und sprechen zum Diktieren — Strg + Alt + D zweimal antippen für den Freihand-Modus.",
-        "Kostenlos: 1500 Wörter/Woche. Für unbegrenztes Diktieren einen Pro-Code in den Riff-Einstellungen einlösen.",
-      ],
+      platforms: {
+        win: {
+          label: "Riff für Windows herunterladen",
+          url:
+            process.env.RIFF_DOWNLOAD_URL_WIN ||
+            process.env.RIFF_DOWNLOAD_URL ||
+            "https://github.com/BreezyBuddy69/riff-site/releases/download/v1.0.0/Riff-Setup.exe",
+          steps: [
+            "Riff-Setup.exe herunterladen und doppelklicken — installiert sich automatisch, kein Entpacken nötig.",
+            "Windows SmartScreen kann beim ersten Start warnen (unsignierte App) — „Weitere Informationen“ → „Trotzdem ausführen“.",
+            "Riff startet nach der Installation automatisch und legt eine Verknüpfung im Startmenü an.",
+            "Strg + Alt halten und sprechen zum Diktieren — Strg + Alt + D zweimal antippen für den Freihand-Modus.",
+            "Kostenlos: 1500 Wörter/Woche. Für unbegrenztes Diktieren einen Pro-Code in den Riff-Einstellungen einlösen.",
+          ],
+        },
+        // Beta (2026-08-03): erste macOS-Fassung, auf echter Hardware noch
+        // nicht getestet (kein Mac verfuegbar, nur ueber einen GitHub-Actions-
+        // macOS-Runner kompiliert+paketiert verifiziert) - Steps/Label sagen
+        // das ehrlich, statt es wie die ausgereifte Windows-Version zu verkaufen.
+        mac: {
+          label: "Riff für Mac herunterladen (Beta)",
+          beta: true,
+          url:
+            process.env.RIFF_DOWNLOAD_URL_MAC ||
+            "https://github.com/BreezyBuddy69/riff-site/releases/download/v1.0.0/Riff-Mac.zip",
+          steps: [
+            "Beta: erste macOS-Version, noch nicht auf echter Hardware getestet — Feedback ist willkommen, aber erwarte Kinderkrankheiten.",
+            "Riff-Mac.zip entpacken, Riff.app in den Programme-Ordner ziehen.",
+            "Erster Start: Rechtsklick auf Riff.app → Öffnen (unsignierte App, macOS fragt einmal nach).",
+            "Systemeinstellungen → Datenschutz & Sicherheit → Bedienungshilfen: Riff die Berechtigung erteilen — ohne das funktioniert weder der Shortcut noch das Einfügen des Texts.",
+            "Strg + Alt halten und sprechen zum Diktieren — Strg + Alt + D zweimal antippen für den Freihand-Modus.",
+          ],
+        },
+      },
     },
   },
   // Zweiter, unabhaengiger Code-Pool fuer die App-interne Pro-Freischaltung

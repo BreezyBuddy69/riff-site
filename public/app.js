@@ -231,14 +231,59 @@ function showSuccess(data) {
   document.getElementById("success-receipt-id").textContent = data.redemptionId || "–";
 
   const delivery = data.delivery || {};
+  const platforms = delivery.platforms || {};
   const deliveryBox = document.getElementById("success-delivery");
-  if (delivery.url) {
+  const stepsList = document.getElementById("success-steps");
+
+  function renderPlatform(key) {
+    const p = platforms[key];
+    if (!p) return;
     const a = document.createElement("a");
     a.className = "btn btn-glass btn-primary";
-    a.href = delivery.url;
+    a.href = p.url;
     a.rel = "noopener";
-    a.textContent = delivery.label || "Jetzt herunterladen";
-    deliveryBox.replaceChildren(a);
+    a.textContent = p.label || "Jetzt herunterladen";
+    stepsList.replaceChildren(
+      ...(p.steps || []).map((s) => {
+        const li = document.createElement("li");
+        li.textContent = s;
+        return li;
+      })
+    );
+    const picker = deliveryBox.querySelector(".platform-picker");
+    if (picker) {
+      for (const btn of picker.children) {
+        const active = btn.dataset.platform === key;
+        btn.className = `btn btn-small ${active ? "btn-glass btn-primary" : "btn-ghost"}`;
+      }
+    }
+    const existingLink = deliveryBox.querySelector("a.btn-primary");
+    if (existingLink) existingLink.replaceWith(a);
+    else deliveryBox.appendChild(a);
+  }
+
+  const platformKeys = Object.keys(platforms);
+  if (platformKeys.length > 1) {
+    // Mehr als eine Plattform (win/mac) — Umschalter, Default nach OS-
+    // Erkennung (navigator.userAgent), aber jederzeit manuell wechselbar,
+    // z.B. wenn jemand den Link an einen Freund mit anderem OS weiterreicht.
+    const detected = /Mac/i.test(navigator.userAgent) && platforms.mac ? "mac" : "win";
+    const picker = document.createElement("div");
+    picker.className = "platform-picker";
+    picker.style.cssText = "display:flex;gap:8px;justify-content:center;margin-bottom:14px;";
+    for (const key of platformKeys) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.dataset.platform = key;
+      btn.textContent = platforms[key].beta ? `${key === "mac" ? "macOS" : "Windows"} (Beta)` : key === "mac" ? "macOS" : "Windows";
+      btn.addEventListener("click", () => renderPlatform(key));
+      picker.appendChild(btn);
+    }
+    deliveryBox.replaceChildren(picker);
+    renderPlatform(detected);
+  } else if (platformKeys.length === 1) {
+    deliveryBox.replaceChildren();
+    renderPlatform(platformKeys[0]);
   } else {
     const note = document.createElement("p");
     note.className = "success-delivery-note";
@@ -246,15 +291,6 @@ function showSuccess(data) {
       "Dein Zugang ist reserviert und verbucht. Der Download-Link wird gerade freigeschaltet — bewahre deine Beleg-ID auf, sie ist dein Nachweis.";
     deliveryBox.replaceChildren(note);
   }
-
-  const stepsList = document.getElementById("success-steps");
-  stepsList.replaceChildren(
-    ...(delivery.steps || []).map((s) => {
-      const li = document.createElement("li");
-      li.textContent = s;
-      return li;
-    })
-  );
 
   successState.hidden = false;
   if (data.status) renderScarcity(data.status);
