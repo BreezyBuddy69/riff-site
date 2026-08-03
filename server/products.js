@@ -65,9 +65,9 @@ const PRODUCTS = {
             process.env.RIFF_DOWNLOAD_URL_MAC ||
             "https://github.com/BreezyBuddy69/riff-site/releases/download/v1.0.0/Riff-Mac.zip",
           steps: [
-            "Beta: erste macOS-Version, noch nicht auf echter Hardware getestet — Feedback ist willkommen, aber erwarte Kinderkrankheiten.",
+            "Beta: erste macOS-Version. Jetzt als Universal-Build (Intel + Apple Silicon) — Feedback ist willkommen, aber erwarte Kinderkrankheiten.",
             "Riff-Mac.zip entpacken, Riff.app in den Programme-Ordner ziehen.",
-            "Erster Start: Rechtsklick auf Riff.app → Öffnen (unsignierte App, macOS fragt einmal nach).",
+            "Erster Start: Rechtsklick auf Riff.app → Öffnen. Bleibt das Icon ausgegraut mit einem X oder meldet macOS „beschädigt“/„kann nicht geöffnet werden“: Terminal öffnen, `xattr -cr /Applications/Riff.app` ausführen (entfernt die Downloadsperre), dann nochmal per Rechtsklick → Öffnen starten.",
             "Systemeinstellungen → Datenschutz & Sicherheit → Bedienungshilfen: Riff die Berechtigung erteilen — ohne das funktioniert weder der Shortcut noch das Einfügen des Texts.",
             "Strg + Alt halten und sprechen zum Diktieren — Strg + Alt + D zweimal antippen für den Freihand-Modus.",
           ],

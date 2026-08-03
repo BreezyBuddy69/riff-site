@@ -7,3 +7,13 @@ service-account*.json
 # oder per RIFF_DOWNLOAD_URL auf eine externe Ablage zeigen.
 public/downloads/*.zip
 public/downloads/*.exe
+
+# Desktop-App (app/) — 2026-08 aus riff-app hierher gemergt, ein Repo statt
+# zwei. Eigene lokale Zustandsdateien, analog zu oben.
+app/node_modules/
+app/dist/
+app/config.json
+app/data.json
+app/*.log
+app/helper/RiffHelperMac
+app/helper/RiffHelperMac-*

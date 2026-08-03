@@ -1,0 +1,54 @@
+{
+  "name": "riff",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Riff - Spracherkennung, die schneller ist als Tippen. Shortcut halten oder doppelt antippen, sprechen, loslassen.",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/check.js",
+    "dist": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "build:helper:mac": "swiftc -target x86_64-apple-macos11 helper/RiffHelperMac.swift -o helper/RiffHelperMac-x64 && swiftc -target arm64-apple-macos11 helper/RiffHelperMac.swift -o helper/RiffHelperMac-arm64 && lipo -create helper/RiffHelperMac-x64 helper/RiffHelperMac-arm64 -output helper/RiffHelperMac && rm helper/RiffHelperMac-x64 helper/RiffHelperMac-arm64 && chmod +x helper/RiffHelperMac"
+  },
+  "build": {
+    "appId": "cloud.halovision.riff",
+    "productName": "Riff",
+    "directories": { "output": "dist" },
+    "asar": false,
+    "publish": null,
+    "files": [
+      "src/**/*",
+      "helper/**/*",
+      "scripts/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": ["nsis", "portable"],
+      "icon": "assets/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "mac": {
+      "target": [{ "target": "zip", "arch": ["universal"] }],
+      "icon": "assets/icon.png",
+      "identity": null
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true,
+      "shortcutName": "Riff",
+      "artifactName": "Riff-Setup.exe"
+    },
+    "portable": {
+      "artifactName": "Riff-Portable.exe"
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  }
+}
