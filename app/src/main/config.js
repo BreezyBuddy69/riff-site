@@ -29,9 +29,13 @@ const DEFAULTS = {
   },
   voice: {
     enabled: true,
-    // 'de' statt 'auto': Whisper mit Auto-Erkennung uebersetzt kurze
-    // deutsche Saetze sporadisch ins Englische - siehe Sable2 D40.
-    language: 'de',
+    // Nutzerwunsch 2026-08-04: wieder 'auto'. Der alte Grund fuer 'de'
+    // (Sable2 D40: Whisper-Auto-Erkennung uebersetzte kurze deutsche Saetze
+    // sporadisch ins Englische) trifft die heutige Route nicht mehr - die
+    // n8n-STT laeuft ueber ein Chat-Modell mit explizitem
+    // "uebersetze NIEMALS"-Prompt, und speechRecognition.js schickt bei
+    // 'auto' inzwischen wirklich 'auto' statt hart 'de'.
+    language: 'auto',
     noiseSuppression: true,
     audioDeviceId: '', // '' = System-Standardmikrofon
     // Turbo statt Full (Nutzer-Feedback: Kosten-Dashboard zeigte Whisper als

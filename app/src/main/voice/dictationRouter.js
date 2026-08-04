@@ -35,10 +35,14 @@ const MAX_CAPTURE_MS = 5 * 60 * 1000;
 const IDLE_HIDE_MS = 700;
 const ERROR_HIDE_MS = 6000;
 // Nutzerwunsch: der zweite Netzwerk-Roundtrip (Cleanup-LLM) kostet spuerbare
-// Latenz und lohnt sich bei kurzen Aeusserungen kaum - Schwelle deutlich
-// angehoben (war 3 Woerter, praktisch "nie skip") auf "ein bis zwei kurze
-// Saetze bleiben roh, ab ~drei Saetzen greift die Bereinigung".
-const SKIP_CLEANUP_MAX_WORDS = 25;
+// Latenz und lohnt sich bei kurzen Aeusserungen kaum - Schwelle in zwei
+// Schritten angehoben: 3 (praktisch "nie skip") -> 25 -> 100 Woerter.
+// 100 Woerter sind ~600-700 Zeichen, also mehrere Absaetze Diktat; alles
+// darunter wird jetzt roh gepastet und spart den kompletten zweiten
+// Roundtrip. Der Nutzer nannte "ueber 1000 Zeichen / 100-150 Woerter" -
+// Woerter allein reichen als EINE Schwelle, ein zusaetzlicher Zeichen-Check
+// wuerde bei normalem Text ohnehin immer nach dem Wort-Check greifen.
+const SKIP_CLEANUP_MAX_WORDS = 100;
 // Whisper halluziniert auf Stille/Rauschen zuverlaessig Standardphrasen
 // ("Vielen Dank", "Amen", "Untertitelung...") statt leer zu bleiben - ein
 // Bug-Report (2026-07-30): Aufnahme ohne Sprache hat genau das gepastet.
