@@ -171,13 +171,36 @@ function Press-Combo([string]$combo) {
 # Push-to-talk fuer Voice OS (siehe DECISIONS.md D16): Electrons globalShortcut
 # kennt keinen Key-Up, ein echtes Halten-zum-Sprechen braucht daher Low-Level-Tastenstatus.
 # Nutzt dieselbe $VK-Tabelle wie Press-Combo - "ctrl+alt+space" etc.
+# Tasten, die einen Hotkey zu einer ANDEREN Kombination machen, wenn sie
+# zusaetzlich unten sind: Modifier, Buchstaben, Ziffern, F-Tasten, Navigation.
+# Maustasten stehen bewusst NICHT drin - wer waehrend des Diktierens klickt,
+# soll die Aufnahme nicht verlieren (die Klick-weg-Erkennung D40 lebt ohnehin
+# auf dem Einzeltasten-Pfad in key_state).
+$CONFLICT_VK = @(0x10, 0x11, 0x12, 0x5B, 0x5C) +
+  (0x30..0x39) + (0x41..0x5A) + (0x70..0x7B) +
+  @(0x08, 0x09, 0x0D, 0x1B, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2E)
+
 function Test-KeysDown([string]$combo) {
   $parts = $combo.ToLower().Split('+') | Where-Object { $_ -ne '' }
+  $wanted = @()
   foreach ($p in $parts) {
     if (-not $VK.ContainsKey($p)) { return $false }
+    $wanted += $VK[$p]
     if (([SableNative]::GetAsyncKeyState($VK[$p]) -band 0x8000) -eq 0) { return $false }
   }
+  # Exklusiv pruefen: "Strg+Alt unten" war bisher auch dann wahr, wenn der
+  # Nutzer in Wahrheit Strg+Alt+S in einer anderen App gedrueckt hat - die
+  # Bubble kam bei jedem fremden Shortcut hoch, der den Hotkey enthaelt.
+  # Der Scan laeuft nur, wenn die Kombination selbst schon unten ist, also
+  # selten und kurz - im Leerlauf kostet er nichts.
+  foreach ($other in $CONFLICT_VK) {
+    if ($wanted -contains $other) { continue }
+    if (([SableNative]::GetAsyncKeyState($other) -band 0x8000) -ne 0) { return $false }
+  }
   return $true
+  # ponytail: gilt nur fuer Kombinationen. Ein Hotkey aus einer einzelnen Taste
+  # laeuft in key_state ueber den Einzeltasten-Pfad und bleibt nicht-exklusiv -
+  # den braucht die Shift-Abfrage in transforms.js genau so.
 }
 
 function Escape-SendKeys([string]$text) {
