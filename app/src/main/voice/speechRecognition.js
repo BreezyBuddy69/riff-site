@@ -21,6 +21,7 @@ async function transcribeDirect(cfg, base64Wav, opts) {
       model: cfg.voice.speechModel,
       input_audio: { data: base64Wav, format: 'wav' },
       ...(cfg.voice.language && cfg.voice.language !== 'auto' ? { language: cfg.voice.language } : {}),
+      ...(opts.prompt ? { prompt: opts.prompt } : {}),
       provider: { order: ['groq'] },
     }),
     signal: AbortSignal.timeout(opts.partial ? 8000 : 15000),
@@ -48,6 +49,19 @@ async function transcribeViaN8n(base64Wav, language, opts) {
   return { ok: !!data.ok, text: data.text || '', error: data.error || null };
 }
 
+// Whisper unterstuetzt einen `prompt`-Parameter als Vokabular-Hinweis (bekannte
+// Schreibweisen VOR der Erkennung statt hinterher zu korrigieren) - genau der
+// Punkt, an dem oft gesagte Woerter am billigsten richtig ankommen. Nur der
+// transcribeDirect-Pfad (echtes Whisper via Groq) nutzt das; der n8n-Fallback
+// laeuft inzwischen ueber ein Chat-Modell ohne dieses Feld (DECISIONS.md).
+// ponytail: harte Zeichenobergrenze statt Tokenbudget - Whisper-Prompts sind
+// ohnehin auf ~224 Tokens gedeckelt, ein grosses Woerterbuch wuerde sonst
+// stillschweigend abgeschnitten.
+function vocabularyPrompt(dictionary) {
+  const terms = (dictionary || []).map((d) => d.term).filter(Boolean);
+  return terms.length ? terms.join(', ').slice(0, 800) : undefined;
+}
+
 async function transcribe(cfg, pcmBuffer, sampleRate, opts = {}) {
   try {
     const base64Wav = encodeWav(pcmBuffer, sampleRate).toString('base64');
@@ -59,4 +73,4 @@ async function transcribe(cfg, pcmBuffer, sampleRate, opts = {}) {
   }
 }
 
-module.exports = { transcribe };
+module.exports = { transcribe, vocabularyPrompt };

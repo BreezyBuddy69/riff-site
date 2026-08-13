@@ -165,7 +165,6 @@ if (!app.requestSingleInstanceLock()) {
       history,
       insights: insights.compute(history),
       dictionary: store.dictionary,
-      dictSuggestions: store.suggestions(),
       snippets: store.snippets,
       transforms: store.transforms,
       styles: store.styles,
@@ -218,8 +217,6 @@ if (!app.requestSingleInstanceLock()) {
   ipcMain.handle('history:delete', (_e, id) => { store.deleteHistory(id); return appState(); });
   ipcMain.handle('history:clear', () => { store.clearHistory(); return appState(); });
   ipcMain.handle('list:add', (_e, name, fields) => { store.listAdd(name, fields); return appState(); });
-  ipcMain.handle('dict:accept-suggestion', (_e, term) => { store.acceptSuggestion(term); return appState(); });
-  ipcMain.handle('dict:dismiss-suggestion', (_e, term) => { store.dismissSuggestion(term); return appState(); });
   ipcMain.handle('list:update', (_e, name, id, fields) => { store.listUpdate(name, id, fields); return appState(); });
   ipcMain.handle('list:remove', (_e, name, id) => { store.listRemove(name, id); return appState(); });
   ipcMain.handle('styles:set', (_e, partial) => { store.setStyles(partial); return appState(); });

@@ -7,9 +7,10 @@ const assert = require('node:assert/strict');
 
 const insights = require('../src/main/insights');
 const { resolveDictation, applySnippets } = require('../src/main/voice/dictationEngine');
-const { categorize, cleanupExtras } = require('../src/main/appContext');
+const { categorize, cleanupExtras, matchesDictionary } = require('../src/main/appContext');
 const { parseAccelerator, hotkeyLabel, savingsHoursPerWeek } = require('../src/renderer/app/onboardingLogic');
 const { isSilence, isSpeech, isHallucination } = require('../src/main/voice/silenceFilter');
+const { vocabularyPrompt } = require('../src/main/voice/speechRecognition');
 
 function pcm(samples) {
   const buf = Buffer.alloc(samples.length * 2);
@@ -115,6 +116,17 @@ const entry = (over = {}) => ({
   assert.equal(cleanupExtras({ other: 'formal' }, 'other', []), '');
   const extras = cleanupExtras({ personal: 'very-casual' }, 'personal', [{ term: 'Riff' }]);
   assert.ok(extras.includes('lowercase') && extras.includes('Riff'));
+}
+
+// --- Woerterbuch-Relevanz: steuert, ob der Cleanup-Roundtrip fuer sonst -----
+// uebersprungene kurze Aeusserungen trotzdem laeuft (Regression: ohne diesen
+// Check greift das Woerterbuch bei normalen kurzen Diktaten faktisch nie).
+{
+  assert.ok(matchesDictionary([{ term: 'Riff' }], 'ich nutze rif jeden tag'), 'phonetischer Praefix-Treffer wird erkannt');
+  assert.ok(!matchesDictionary([{ term: 'Riff' }], 'ich mache heute nichts besonderes'), 'kein Treffer ohne Praefix im Rohtext');
+  assert.ok(!matchesDictionary([], 'irgendein text'), 'leeres Woerterbuch matcht nie');
+  assert.equal(vocabularyPrompt([{ term: 'Riff' }, { term: 'Mikus' }]), 'Riff, Mikus', 'Begriffe werden als Komma-Liste durchgereicht');
+  assert.equal(vocabularyPrompt([]), undefined, 'leeres Woerterbuch liefert keinen Prompt-Zusatz');
 }
 
 // --- Onboarding: Accelerator-Parsing (Shortcut-Test-Screen) -----------------

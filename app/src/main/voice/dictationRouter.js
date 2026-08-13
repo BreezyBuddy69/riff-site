@@ -230,7 +230,11 @@ async function finish() {
     return;
   }
 
-  const asr = await speechRecognition.transcribe(cfg, buf, SAMPLE_RATE, { partial: false });
+  const dictionary = store.dictionary;
+  const asr = await speechRecognition.transcribe(cfg, buf, SAMPLE_RATE, {
+    partial: false,
+    prompt: speechRecognition.vocabularyPrompt(dictionary),
+  });
   if (!asr.ok || !asr.text.trim()) {
     phase = 'error';
     voiceWindow.resize('error');
@@ -253,10 +257,15 @@ async function finish() {
   const wordCount = asr.text.trim().split(/\s+/).length;
   const category = appContext.categorize(sessionApp.app);
   const styles = store.styles;
-  const dictionary = store.dictionary;
   // autoCleanup aus: Rohtranskript wird gepastet (Nutzer will exakt das
   // Gesprochene, ohne Modell dazwischen) - spart auch den zweiten Roundtrip.
-  const skipCleanup = wordCount <= SKIP_CLEANUP_MAX_WORDS || styles.autoCleanup === false;
+  // Sonst: kurze Aeusserungen ueberspringen den Roundtrip NUR, wenn kein
+  // Woerterbuch-Begriff moeglicherweise betroffen ist - sonst wuerde das
+  // Woerterbuch (siehe appContext.cleanupExtras) bei normalen, meist kurzen
+  // Diktaten faktisch nie greifen (Nutzer-Feedback: Korrektur "funktioniert
+  // nicht beim Aufnehmen").
+  const skipCleanup = styles.autoCleanup === false
+    || (wordCount <= SKIP_CLEANUP_MAX_WORDS && !appContext.matchesDictionary(dictionary, asr.text));
   const cleanedText = skipCleanup
     ? asr.text
     : (await transcriptCleanup.clean(cfg, asr.text, appContext.cleanupExtras(styles, category, dictionary, asr.text))).text;

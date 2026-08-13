@@ -76,6 +76,21 @@ function relevantTerms(terms, rawText) {
   return hits.length ? hits : terms.slice(0, FILTER_ABOVE);
 }
 
+// Ob eine Aeusserung ueberhaupt zu einem Woerterbuch-Begriff passen koennte -
+// dieselbe Praefix-Heuristik wie relevantTerms, aber IMMER aktiv (auch bei
+// kleinen Woerterbuechern, die relevantTerms ungefiltert durchreicht). Steuert
+// in dictationRouter.js, ob sich der zweite Cleanup-Roundtrip fuer eine sonst
+// uebersprungene kurze Aeusserung trotzdem lohnt - ohne diesen Check korrigiert
+// das Woerterbuch faktisch nie etwas, weil normale Diktate fast immer unter
+// der SKIP_CLEANUP_MAX_WORDS-Schwelle bleiben.
+function matchesDictionary(dictionary, rawText) {
+  const raw = (rawText || '').toLowerCase();
+  return (dictionary || []).some((d) => {
+    const t = (d.term || '').toLowerCase();
+    return t.length >= 2 && raw.includes(t.slice(0, Math.min(3, t.length)));
+  });
+}
+
 // Baut den Zusatz zum Cleanup-Prompt aus Stil-Einstellung + Wörterbuch.
 // Leerer String = Cleanup läuft genau wie vorher.
 function cleanupExtras(styles, category, dictionary, rawText) {
@@ -92,4 +107,4 @@ function cleanupExtras(styles, category, dictionary, rawText) {
   return parts.join('\n');
 }
 
-module.exports = { categorize, cleanupExtras, CATEGORY_LABELS, STYLE_LABELS, STYLE_INSTRUCTIONS };
+module.exports = { categorize, cleanupExtras, matchesDictionary, CATEGORY_LABELS, STYLE_LABELS, STYLE_INSTRUCTIONS };

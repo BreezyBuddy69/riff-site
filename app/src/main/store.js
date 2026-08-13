@@ -204,18 +204,26 @@ function listRemove(name, id) {
   return d[name].length !== before;
 }
 
-// ---------- Wörterbuch-Vorschläge ----------
-// Nutzerwunsch (2026-07-30): Riff soll oft gesagte Woerter selbst erkennen
-// und als Vorschlag anbieten, statt dass der Nutzer sie manuell eintraegt.
-// Zaehlt pro Diktat jedes ungewoehnliche Wort HOECHSTENS einmal (sonst
-// taeuscht ein einzelner Satz mit Wortwiederholung mehrere "Sitzungen" vor).
-
+// ---------- Wörterbuch-Autolearn ----------
+// Nutzerwunsch (2026-07-30, verschaerft 2026-08-13): Riff soll oft gesagte
+// Woerter selbst erkennen UND automatisch ins Wörterbuch aufnehmen, ohne dass
+// der Nutzer jeden Vorschlag einzeln bestaetigt - ein Fehltreffer laesst sich
+// im Wörterbuch-Tab genauso mit einem Klick wieder loeschen wie ein manuell
+// eingetragener Begriff. Zaehlt pro Diktat jedes ungewoehnliche Wort
+// HOECHSTENS einmal (sonst taeuscht ein einzelner Satz mit Wortwiederholung
+// mehrere "Sitzungen" vor).
+// ponytail: kein "nie wieder vorschlagen"-Blocklist mehr fuer geloeschte
+// Autolearn-Begriffe (ignoredTerms wird nur noch gelesen, nie mehr
+// geschrieben) - wer einen falsch gelernten Begriff loescht, sieht ihn erst
+// nach erneut SUGGESTION_THRESHOLD Erwaehnungen wieder. Aufwerten, falls sich
+// Fehltreffer haeufig genug wiederholen, um das zu stoeren.
 function learnWords(cleanedText, dictionary) {
   const d = load();
   const known = new Set((dictionary || []).map((e) => (e.term || '').toLowerCase()));
   const ignored = new Set(d.ignoredTerms);
   const seenInUtterance = new Set();
   const words = String(cleanedText || '').match(/\p{L}[\p{L}'-]*/gu) || [];
+  let changed = false;
   for (const w of words) {
     const norm = w.toLowerCase();
     if (norm.length < SUGGESTION_MIN_WORD_LEN) continue;
@@ -224,36 +232,14 @@ function learnWords(cleanedText, dictionary) {
     if (seenInUtterance.has(norm)) continue;
     seenInUtterance.add(norm);
     d.wordFreq[norm] = (d.wordFreq[norm] || 0) + 1;
+    changed = true;
+    if (d.wordFreq[norm] >= SUGGESTION_THRESHOLD) {
+      delete d.wordFreq[norm];
+      d.dictionary.unshift({ id: newId(), ts: new Date().toISOString(), term: w });
+      known.add(norm);
+    }
   }
-  if (seenInUtterance.size) scheduleWrite();
-}
-
-// Gibt Woerter zurueck, die die Schwelle erreicht haben - mit der zuletzt im
-// Rohtext gesehenen Schreibweise (Grossschreibung), damit ein Vorschlag nicht
-// in Kleinbuchstaben im Wörterbuch landet.
-function suggestions() {
-  const d = load();
-  return Object.entries(d.wordFreq)
-    .filter(([, count]) => count >= SUGGESTION_THRESHOLD)
-    .map(([term, count]) => ({ term, count }))
-    .sort((a, b) => b.count - a.count);
-}
-
-function dismissSuggestion(term) {
-  const d = load();
-  const norm = String(term || '').toLowerCase();
-  delete d.wordFreq[norm];
-  if (!d.ignoredTerms.includes(norm)) d.ignoredTerms.push(norm);
-  scheduleWrite();
-}
-
-// Ein angenommener Vorschlag ist kein Kandidat mehr, egal ob er ueber
-// listAdd('dictionary', ...) oder die Vorschlagsliste hinzugefuegt wurde.
-function acceptSuggestion(term) {
-  const d = load();
-  delete d.wordFreq[String(term || '').toLowerCase()];
-  scheduleWrite();
-  return listAdd('dictionary', { term });
+  if (changed) scheduleWrite();
 }
 
 // ---------- Stil ----------
@@ -270,7 +256,7 @@ module.exports = {
   load, flush,
   addHistory, deleteHistory, clearHistory,
   listAdd, listUpdate, listRemove,
-  learnWords, suggestions, dismissSuggestion, acceptSuggestion,
+  learnWords,
   setStyles,
   get history() { return load().history; },
   get dictionary() { return load().dictionary; },

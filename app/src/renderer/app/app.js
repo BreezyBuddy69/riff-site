@@ -249,30 +249,7 @@ function renderList(container, items, renderRow, emptyText) {
   for (const item of items) el.append(renderRow(item));
 }
 
-function renderDictSuggestions() {
-  const wrap = $('dictSuggestionsWrap');
-  const list = S.dictSuggestions || [];
-  wrap.style.display = list.length ? '' : 'none';
-  renderList('dictSuggestions', list, (s) => node('div', { class: 'row' }, [
-    node('div', { class: 'body' }, [
-      node('div', { class: 'term', text: s.term }),
-      node('div', { class: 'term-note', text: `${s.count}× gesagt` }),
-    ]),
-    node('div', { class: 'actions' }, [
-      node('button', {
-        class: 'icon-btn', type: 'button', title: 'Hinzufügen',
-        onclick: async () => { apply(await window.riff.acceptDictSuggestion(s.term)); toast('Begriff hinzugefügt.'); },
-      }, '✓'),
-      node('button', {
-        class: 'icon-btn danger', type: 'button', title: 'Verwerfen',
-        onclick: async () => apply(await window.riff.dismissDictSuggestion(s.term)),
-      }, '✕'),
-    ]),
-  ]), '');
-}
-
 function renderDictionary() {
-  renderDictSuggestions();
   renderList('dictList', S.dictionary, (d) => node('div', { class: 'row' }, [
     node('div', { class: 'body' }, [
       node('div', { class: 'term', text: d.term }),
@@ -284,7 +261,7 @@ function renderDictionary() {
         onclick: async () => apply(await window.riff.listRemove('dictionary', d.id)),
       }, '✕'),
     ]),
-  ]), 'Noch keine Begriffe. Trage Namen ein, die die Erkennung regelmäßig falsch schreibt.');
+  ]), 'Noch keine Begriffe. Trage Namen ein, die die Erkennung regelmäßig falsch schreibt, oder sag sie ein paar Mal — Riff lernt sie dann von selbst.');
 }
 
 $('dictForm').addEventListener('submit', async (e) => {

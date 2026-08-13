@@ -19,8 +19,6 @@ contextBridge.exposeInMainWorld('riff', {
   listAdd: (name, fields) => ipcRenderer.invoke('list:add', name, fields),
   listUpdate: (name, id, fields) => ipcRenderer.invoke('list:update', name, id, fields),
   listRemove: (name, id) => ipcRenderer.invoke('list:remove', name, id),
-  acceptDictSuggestion: (term) => ipcRenderer.invoke('dict:accept-suggestion', term),
-  dismissDictSuggestion: (term) => ipcRenderer.invoke('dict:dismiss-suggestion', term),
   setStyles: (partial) => ipcRenderer.invoke('styles:set', partial),
   copy: (text) => ipcRenderer.send('clipboard:write', text),
 
