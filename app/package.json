@@ -35,7 +35,7 @@
       "identity": null,
       "x64ArchFiles": "Contents/Resources/app/helper/RiffHelperMac"
     },
-    "afterPack": "scripts/afterPack-mac.js",
+    "afterSign": "scripts/afterSign-mac.js",
     "nsis": {
       "oneClick": true,
       "perMachine": false,
