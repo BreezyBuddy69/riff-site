@@ -320,6 +320,14 @@
           </select>
         </label>
         <p class="hint">Standard ist „Automatisch erkennen" — Riff erkennt die Sprache pro Diktat selbst und übersetzt nie. Eine feste Sprache nur einstellen, wenn die Erkennung bei dir daneben liegt.</p>
+        <label>Erkennungsmodell
+          <select id="speechModel">
+            <option value="openai/whisper-large-v3-turbo">Whisper Large v3 Turbo (Standard, günstig)</option>
+            <option value="openai/whisper-large-v3">Whisper Large v3 (genauer, teurer)</option>
+            <option value="nvidia/parakeet-tdt-0.6b-v3">Parakeet TDT 0.6B v3 (bestes Preis-Leistungs-Verhältnis)</option>
+          </select>
+        </label>
+        <p class="hint">Wirkt nur mit eigenem OpenRouter-Key (siehe unten) — ohne Key läuft die Erkennung über Riffs Server mit fixem Modell.</p>
         <label class="row"><input id="noiseSuppression" type="checkbox" /> Rauschunterdrückung</label>
         <label>Mikrofon
           <span><select id="settingsMicDevice"></select> <button id="btnRefreshMics" type="button" class="btn-ghost small">Aktualisieren</button></span>

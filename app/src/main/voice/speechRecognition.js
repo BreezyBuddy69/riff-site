@@ -10,6 +10,12 @@ const { encodeWav } = require('./wav');
 
 const N8N_STT_URL = 'https://n8n.halovisionai.cloud/webhook/riff-stt';
 
+// Whisper liegt auf OpenRouter bei mehreren Anbietern - Pin auf Groq erzwingt
+// dessen ~200x-Realtime-Inferenz statt eines langsameren Defaults. Andere
+// waehlbare Modelle (z.B. Parakeet) haben auf OpenRouter nur einen Anbieter,
+// ein Pin waere dort wirkungslos bzw. koennte den einzigen Treffer ausschliessen.
+const GROQ_PINNED_MODELS = new Set(['openai/whisper-large-v3-turbo', 'openai/whisper-large-v3']);
+
 async function transcribeDirect(cfg, base64Wav, opts) {
   const res = await fetch('https://openrouter.ai/api/v1/audio/transcriptions', {
     method: 'POST',
@@ -22,7 +28,7 @@ async function transcribeDirect(cfg, base64Wav, opts) {
       input_audio: { data: base64Wav, format: 'wav' },
       ...(cfg.voice.language && cfg.voice.language !== 'auto' ? { language: cfg.voice.language } : {}),
       ...(opts.prompt ? { prompt: opts.prompt } : {}),
-      provider: { order: ['groq'] },
+      ...(GROQ_PINNED_MODELS.has(cfg.voice.speechModel) ? { provider: { order: ['groq'] } } : {}),
     }),
     signal: AbortSignal.timeout(opts.partial ? 8000 : 15000),
   });

@@ -289,3 +289,21 @@ Problem, aber ein Verhalten, das der alte Whisper-Pfad so nicht hatte. Wer
 einen eigenen OpenRouter-Key in den Settings hinterlegt, bekommt weiterhin den
 direkten `transcribeDirect`-Pfad (echtes Whisper via Groq) statt dieses
 Fallbacks.
+
+**D38 — STT-Modell in den Settings waehlbar, Parakeet TDT 0.6B v3 als neue
+Option (2026-08-17).** `speechModel` (config.js) war zwar seit D0 ein Feld,
+hatte aber nie eine UI - nur per Hand editierbarer Default. Jetzt ein
+`<select>` in den Einstellungen (Whisper Turbo/Whisper Large/Parakeet TDT
+0.6B v3), analog zum Sprach-Select. Default bleibt Whisper Large v3 Turbo
+(Kostengrund von weiter oben gilt unveraendert) - Parakeet ist nur eine
+zusaetzliche Option, kein neuer Default, trotz besserer Preis-Leistung laut
+Nutzer-Recherche (Groq-Whisper-Turbo ist auf reinem $/Minute-Vergleich sogar
+noch guenstiger, Parakeet gewinnt auf Qualitaet). `speechRecognition.js`
+pinnt den `provider.order:['groq']`-Parameter nur noch fuer die beiden
+Whisper-Modelle: Parakeet liegt auf OpenRouter nur bei einem Anbieter (nicht
+Groq), ein Pin auf Groq wuerde dort schlicht keinen Treffer finden. Gilt nur
+fuer den `transcribeDirect`-Pfad (eigener OpenRouter-Key) - der n8n-Fallback
+(`riff-stt`, siehe oben) laeuft ueber `google/gemini-3.5-flash-lite`
+Chat-Completions statt eines echten ASR-Endpoints und kennt `speechModel`
+gar nicht; ihn ebenfalls umschaltbar zu machen waere ein eigener Umbau des
+n8n-Workflows, nicht Teil dieser Aenderung.

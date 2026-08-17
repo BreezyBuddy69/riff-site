@@ -585,6 +585,7 @@ function renderSettings() {
   $('flowHold').value = S.config.hotkeys.flowHold;
   $('flowToggle').value = S.config.hotkeys.flowToggle;
   $('language').value = S.config.voice.language;
+  $('speechModel').value = S.config.voice.speechModel;
   $('noiseSuppression').checked = S.config.voice.noiseSuppression;
   $('openRouterApiKey').value = S.config.voice.openRouterApiKey;
   $('bubbleEnabled').checked = S.config.voice.bubbleEnabled !== false;
@@ -623,6 +624,7 @@ $('save').addEventListener('click', async () => {
     },
     voice: {
       language: $('language').value.trim(),
+      speechModel: $('speechModel').value,
       noiseSuppression: $('noiseSuppression').checked,
       openRouterApiKey: $('openRouterApiKey').value.trim(),
       audioDeviceId: $('settingsMicDevice').value,
