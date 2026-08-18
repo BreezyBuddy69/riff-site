@@ -301,9 +301,21 @@ Nutzer-Recherche (Groq-Whisper-Turbo ist auf reinem $/Minute-Vergleich sogar
 noch guenstiger, Parakeet gewinnt auf Qualitaet). `speechRecognition.js`
 pinnt den `provider.order:['groq']`-Parameter nur noch fuer die beiden
 Whisper-Modelle: Parakeet liegt auf OpenRouter nur bei einem Anbieter (nicht
-Groq), ein Pin auf Groq wuerde dort schlicht keinen Treffer finden. Gilt nur
-fuer den `transcribeDirect`-Pfad (eigener OpenRouter-Key) - der n8n-Fallback
-(`riff-stt`, siehe oben) laeuft ueber `google/gemini-3.5-flash-lite`
-Chat-Completions statt eines echten ASR-Endpoints und kennt `speechModel`
-gar nicht; ihn ebenfalls umschaltbar zu machen waere ein eigener Umbau des
-n8n-Workflows, nicht Teil dieser Aenderung.
+Groq), ein Pin auf Groq wuerde dort schlicht keinen Treffer finden. Gilt fuer
+den `transcribeDirect`-Pfad (eigener OpenRouter-Key).
+
+**Nachtrag (2026-08-17, selber Tag):** Nutzerwunsch, das AUCH fuer den
+n8n-Fallback nachzuziehen - der lief seit dem Fix vom 2026-07-29 ueber
+`google/gemini-3.5-flash-lite` Chat-Completions statt eines echten
+ASR-Endpoints (siehe Blocker-Eintrag oben) und kannte `speechModel` gar
+nicht. Workflow `sMzWUdNhAqHAixA0` (n8n, umbenannt zu "Riff – STT (Parakeet
+via OpenRouter)") laeuft jetzt wieder gegen den echten
+`/audio/transcriptions`-Endpoint mit `nvidia/parakeet-tdt-0.6b-v3` - derselbe
+Credential ("OpenRouter account", `GDFOYPAtBRjNOgyd`), der seit dem Fix
+bewiesen funktioniert. Der 401 von damals kam nachweislich von einer
+abgelaufenen ANDEREN Credential, nicht vom Endpoint - der Umweg ueber
+Chat-Completions war also nie zwingend. `Normalize` liest wieder `body.text`
+statt `body.choices[0].message.content`. Live verifiziert per curl direkt
+gegen `n8n.halovisionai.cloud/webhook/riff-stt` (Stille-WAV, `language`
+sowohl `auto` als `de`): `ok:true`, HTTP 200, leerer Text (korrekt fuer
+Stille - kein Halluzinieren mehr wie beim Chat-Modell-Pfad).
