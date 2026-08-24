@@ -1,26 +1,30 @@
-// Doppel-Tap-Watcher (Mode B, Master-Prompt §6.1 in websites/riff-MASTER-
-// PROMPT.md): erkennt zwei kurze Druecke derselben Tastenkombination
-// innerhalb von DOUBLE_TAP_GAP_MS und meldet GENAU EIN Ereignis
-// (onDoubleTap) - ob das eine Session startet oder beendet, entscheidet der
-// Aufrufer (dictationRouter kennt den Session-Zustand, dieser Watcher nicht).
+// Toggle-Watcher (Mode B, Master-Prompt §6.1 in websites/riff-MASTER-
+// PROMPT.md): erkennt EINEN kurzen Druck der konfigurierten Kombination
+// (Default Strg+Alt+D) und meldet genau ein Ereignis (onTap) - ob das eine
+// Session startet oder beendet, entscheidet der Aufrufer (dictationRouter
+// kennt den Session-Zustand, dieser Watcher nicht).
+//
+// Frueher brauchte es zwei Taps innerhalb von 400ms. Nutzer-Feedback
+// (2026-08-24): "Strg+Alt+D drücken, die Bubble soll bleiben, nochmal drücken
+// beendet" - der Doppel-Tap wurde in der Praxis nie zuverlaessig getroffen
+// und die Kombination hat stattdessen die Hold-Session (Strg+Alt) angetriggert.
+// Ein Einzel-Tap ist hier gefahrlos, weil die Toggle-Kombination anders als
+// flowHold eine echte Haupttaste enthaelt.
+//
 // Gleiches Polling-Prinzip wie holdWatcher.js (GetAsyncKeyState ueber den
-// Helper), aber Kanten- statt Level-Auswertung: ein einzelnes langes Halten
-// darf NIE als Tap zaehlen - sonst kaeme sich Mode A (halten) mit Mode B
-// (doppelt tippen) in die Quere, wenn beide je einen eigenen, aber schnell
-// aufeinanderfolgenden Tastendruck sehen wuerden.
+// Helper), aber Kanten- statt Level-Auswertung: ein langes Halten darf NIE als
+// Tap zaehlen - sonst kaeme sich Mode A (halten) mit Mode B in die Quere.
 const helper = require('../helper');
 
-const TAP_MAX_MS = 220;        // laenger gehalten = kein Tap mehr (analog HOLD_START_MS in holdWatcher.js)
-const DOUBLE_TAP_GAP_MS = 400; // maximaler Abstand zwischen den beiden Taps
-const POLL_IDLE_MS = 20;       // war 80ms - gleicher Latenz-Fix wie holdWatcher.js, s. dort
-const POLL_ACTIVE_MS = 30;     // Taps sind kurz - braucht feineres Polling als Halten
+const TAP_MAX_MS = 600;   // laenger gehalten = kein Tap mehr. War 220ms - zu knapp fuer eine bewusst gedrueckte Dreier-Kombi (Nutzer-Feedback: "tut nichts")
+const POLL_IDLE_MS = 20;  // war 80ms - gleicher Latenz-Fix wie holdWatcher.js, s. dort
+const POLL_ACTIVE_MS = 30;
 
 let cfg = null;
-let onDoubleTap = null;
+let onTap = null;
 
 let timer = null;
 let downSince = 0;  // 0 = Kombination ist oben
-let firstTapAt = 0; // Zeitstempel des Loslassens des ERSTEN Taps, 0 = keiner "in der Warteschlange"
 let suspended = false;
 let lastAccel = '';
 let helperKeys = '';
@@ -54,35 +58,23 @@ async function poll() {
   } else if (!down && downSince) {
     const heldMs = now - downSince;
     downSince = 0;
-    if (heldMs <= TAP_MAX_MS) {
-      if (firstTapAt && now - firstTapAt <= DOUBLE_TAP_GAP_MS) {
-        firstTapAt = 0;
-        if (onDoubleTap) onDoubleTap();
-      } else {
-        firstTapAt = now;
-      }
-    } else {
-      firstTapAt = 0; // zu lang gehalten - verwirft auch einen evtl. wartenden ersten Tap
-    }
+    if (heldMs <= TAP_MAX_MS && onTap) onTap();
   }
 
-  if (firstTapAt && now - firstTapAt > DOUBLE_TAP_GAP_MS) firstTapAt = 0; // wartender Tap verfaellt von selbst
-
-  schedule(down || firstTapAt ? POLL_ACTIVE_MS : POLL_IDLE_MS);
+  schedule(down ? POLL_ACTIVE_MS : POLL_IDLE_MS);
 }
 
 function reset() {
   downSince = 0;
-  firstTapAt = 0;
 }
 
 function schedule(ms) {
   timer = setTimeout(poll, ms);
 }
 
-function start({ cfgRef, onDoubleTap: cb }) {
+function start({ cfgRef, onTap: cb }) {
   cfg = cfgRef;
-  onDoubleTap = cb;
+  onTap = cb;
   if (!timer) schedule(POLL_IDLE_MS);
 }
 

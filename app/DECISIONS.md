@@ -319,3 +319,49 @@ statt `body.choices[0].message.content`. Live verifiziert per curl direkt
 gegen `n8n.halovisionai.cloud/webhook/riff-stt` (Stille-WAV, `language`
 sowohl `auto` als `de`): `ok:true`, HTTP 200, leerer Text (korrekt fuer
 Stille - kein Halluzinieren mehr wie beim Chat-Modell-Pfad).
+
+## 2026-08-24 — Toggle-Diktat: Einzeldruck, fremde Shortcuts verwerfen, zwei Notausstiege
+
+Bug-Report (per Riff selbst diktiert): "Strg+Alt+D drücken, die Bubble sollte
+bleiben — sie geht aber sofort wieder weg", "wenn ich andere Shortcuts klicke,
+geht sie einfach hoch". Vier Aenderungen, eine gemeinsame Ursache und zwei
+Zusatzwuensche:
+
+**Ursache (der eigentliche Bug):** `key_state` lieferte fuer eine Kombination
+nur EIN Bit — `down`, und das schon exklusiv gegen Fremdtasten geprueft
+(CONFLICT_VK-Scan). Sobald zu einem gehaltenen Strg+Alt eine dritte Taste kam,
+sah das fuer `holdWatcher.js` exakt aus wie Loslassen: `holding` war true, also
+lief `onHoldEnd` → `finish()` → STT-Call → **Paste in die fremde App**. Genau
+das passierte bei jedem eigenen Strg+Alt+D (Bubble blitzt auf, verschwindet
+wieder) und bei jedem fremden Strg+Alt+X-Shortcut. Der Helper gibt jetzt
+zusaetzlich `raw` zurueck (Kombination physisch unten, ohne Exklusiv-Scan) —
+`raw && !down` heisst "dritte Taste dazugekommen" und fuehrt ueber den neuen
+`onHoldAbort` → `abortHold()` zum VERWERFEN statt Abschicken. Der zweite Scan
+laeuft nur, wenn `raw` bereits wahr ist, kostet im Leerlauf also nichts.
+Zusaetzlich: der AltGr-Fast-Path (50ms statt 250ms, siehe Kommentar in
+`holdWatcher.js`) greift nicht mehr, wenn der Toggle-Hotkey die Hold-Kombi
+erweitert ("ctrl+alt" steckt in "ctrl+alt+d") — sonst startet schon das Anlegen
+der Modifier eine Hold-Session, bevor das D ueberhaupt unten ist.
+
+**Doppel-Tap → Einzel-Tap.** `toggleWatcher.js` verlangte zwei Taps in 400ms.
+Nutzer hat den Doppel-Tap in der Praxis nie zuverlaessig getroffen (und der
+erste Tap ist mit dem Fehler oben ohnehin als Hold-Session weggegangen). Ein
+Einzel-Tap ist hier gefahrlos, weil `flowToggle` anders als `flowHold` eine
+echte Haupttaste enthaelt. `TAP_MAX_MS` dabei 220 → 600ms: eine bewusst
+gedrueckte Dreier-Kombi ist laenger unten als ein Tippfehler. Die
+Doppel-Tap-Buchhaltung faellt ersatzlos weg.
+
+**Enter/Leertaste beenden eine laufende Toggle-Session** (Nutzerwunsch) — ueber
+`globalShortcut` statt Tastatur-Polling, weil Electron die Taste dann SCHLUCKT:
+die Leertaste landet nicht zusaetzlich als Zeichen in der App, in die gleich
+gepastet wird. Nur waehrend einer Toggle-Session registriert.
+
+**Zwei Notausstiege:** Aufnahme-Cap 5 → 10 Minuten, plus Stopp nach 60s ohne
+jeden Ton (`SILENCE_STOP_MS`, RMS-Check auf den ohnehin ankommenden PCM-Chunks
+— kein eigener Timer, keine neue VAD). Bewusst deutlich laenger als eine
+Sprechpause: der Grundsatz aus dem Datei-Kopf von `dictationRouter.js` (eine
+Denkpause mitten im Satz darf nie beenden) bleibt unangetastet.
+
+Regression-Check in `test/check.js` (`npm test`, stubbt `helper.request`, laeuft
+unter nacktem Node): Fremdtaste waehrend Hold → `abort`, echtes Loslassen →
+`end`, ein kurzer Toggle-Druck → genau ein Tap, langes Halten → kein Tap.

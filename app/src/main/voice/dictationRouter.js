@@ -10,6 +10,7 @@
 // per Loslassen, Toggle ausschliesslich per zweitem Doppel-Tap oder Klick auf
 // die Haken/Kreuz-Icons der Bubble. Eine kurze Sprechpause mitten im Satz
 // darf eine Aufnahme nie beenden.
+const { globalShortcut } = require('electron');
 const speechRecognition = require('./speechRecognition');
 const transcriptCleanup = require('./transcriptCleanup');
 const dictationEngine = require('./dictationEngine');
@@ -25,8 +26,15 @@ const helper = require('../helper');
 const SAMPLE_RATE = 16000; // Whisper-Standard
 // Harte Obergrenze fuer EINE Aufnahme (uebernommen aus Sable2 D28) - ohne die
 // laeuft eine Aufnahme unbegrenzt weiter, wenn eine klemmende Taste oder ein
-// vergessener Toggle-Modus niemand sie beendet.
-const MAX_CAPTURE_MS = 5 * 60 * 1000;
+// vergessener Toggle-Modus niemand sie beendet. Nutzerwunsch 2026-08-24:
+// 10 statt 5 Minuten.
+const MAX_CAPTURE_MS = 10 * 60 * 1000;
+// Zweiter Notausstieg fuer den Toggle-Modus (Nutzerwunsch 2026-08-24): wer den
+// zweiten Tastendruck vergisst, soll nicht bis zum 10-Minuten-Cap aufnehmen.
+// Bewusst DEUTLICH laenger als eine Sprechpause (vgl. Datei-Kommentar oben:
+// eine Denkpause mitten im Satz darf nie beenden) - eine Minute ohne jeden
+// Ton ist keine Pause mehr, da laeuft die Aufnahme ins Leere.
+const SILENCE_STOP_MS = 60 * 1000;
 // Nutzerwunsch: fuehlte sich traege an ("wartet 5 Sek zum Wegfaden") - war
 // vorher 1400ms. ACHTUNG bei zukuenftigen Latenz-Beschwerden: der weit
 // groessere Anteil der gefuehlten Wartezeit ist fast immer die STT+Cleanup-
@@ -49,7 +57,7 @@ const SKIP_CLEANUP_MAX_WORDS = 300;
 // isSilence/isSpeech/isHallucination sind reine Funktionen in silenceFilter.js
 // (test/check.js prueft sie unter nacktem Node) - hier steht nur noch die
 // Pipeline, die sie verwendet.
-const { isSpeech, isHallucination } = require('./silenceFilter');
+const { isSilence, isSpeech, isHallucination } = require('./silenceFilter');
 
 let cfg = null;
 
@@ -63,6 +71,7 @@ let captureCapTimer = null;
 // darf nie zwischen "Taste los" und "Text steht da" liegen.
 let sessionStartedAt = 0;
 let sessionApp = { app: '', title: '' };
+let lastVoiceAt = 0; // letzter PCM-Chunk mit Pegel ueber der Stille-Schwelle
 
 function isActive() { return kind !== null; }
 function getKind() { return kind; }
@@ -111,6 +120,30 @@ function clearCaptureCap() {
   if (captureCapTimer) { clearTimeout(captureCapTimer); captureCapTimer = null; }
 }
 
+// Nutzerwunsch 2026-08-24: eine laufende Toggle-Session soll auch mit Enter
+// oder Leertaste enden, nicht nur ueber den Shortcut/Haken. globalShortcut
+// statt Tastatur-Polling: Electron SCHLUCKT die Taste, solange sie registriert
+// ist - die Leertaste landet also nicht zusaetzlich als Zeichen in der App, in
+// die gleich gepastet wird. Nur waehrend einer Toggle-Session registriert,
+// danach sofort wieder frei.
+const STOP_ACCELERATORS = ['Return', 'Space'];
+
+function armStopKeys() {
+  for (const accel of STOP_ACCELERATORS) {
+    try {
+      globalShortcut.register(accel, () => { if (kind === 'toggle') finish(); });
+    } catch (err) {
+      console.warn(`[voice] Stopp-Taste ${accel} nicht registrierbar:`, err.message);
+    }
+  }
+}
+
+function disarmStopKeys() {
+  for (const accel of STOP_ACCELERATORS) {
+    try { globalShortcut.unregister(accel); } catch { /* war nie registriert */ }
+  }
+}
+
 function beginSession(newKind) {
   if (!cfg || !cfg.voice.enabled || kind) return false;
   if (!license.canDictate(cfg)) {
@@ -125,6 +158,7 @@ function beginSession(newKind) {
   phase = 'listening';
   pcmChunks = [];
   sessionStartedAt = Date.now();
+  lastVoiceAt = sessionStartedAt;
   sessionApp = { app: '', title: '' };
   // Fire-and-forget: laeuft waehrend gesprochen wird. Kommt die Antwort nicht
   // (Helper beschaeftigt/tot), bleibt der Verlaufseintrag eben ohne App-Label -
@@ -134,6 +168,7 @@ function beginSession(newKind) {
     () => {},
   );
   armCaptureCap();
+  if (newKind === 'toggle') armStopKeys();
   // Toggle-Bubble bekommt Haken/Kreuz-Icons und braucht dafuer die breitere
   // 'toggle'-Groesse + wird dafuer kurz klickbar - Hold-Bubble bleibt bei
   // 'normal' und immer click-through (Master-Prompt §6.6). bubbleEnabled
@@ -173,6 +208,9 @@ function endHold() { if (kind === 'hold') finish(); }
 // Toggle-Session laeuft -> bestaetigen+verarbeiten (identisch zum
 // Haken-Klick). toggleWatcher.js unterscheidet nicht zwischen den beiden
 // Faellen - das entscheidet einzig der hier bekannte Session-Zustand.
+// Eine laufende HOLD-Session laesst der Toggle-Druck bewusst in Ruhe: sonst
+// wuerde ein Strg+Alt+D, dessen Strg+Alt kurz vorher schon eine Hold-Session
+// gestartet hat, sie sofort wieder abschicken.
 function toggleFlow() {
   if (kind === 'toggle') finish();
   else beginSession('toggle');
@@ -182,7 +220,20 @@ function toggleFlow() {
 // NICHT verarbeiten. Nur fuer Mode B sinnvoll (Mode A hat keine Buttons).
 function cancelToggle() {
   if (kind !== 'toggle') return;
+  cancelSession();
+}
+
+// Fremder Shortcut waehrend einer Hold-Session (holdWatcher.js: raw ohne down,
+// z.B. Strg+Alt+S in irgendeiner App) - Aufnahme wegwerfen, NICHT abschicken.
+// Frueher lief dieser Fall in finish() und hat Text in die fremde App gepastet.
+function abortHold() {
+  if (kind !== 'hold') return;
+  cancelSession();
+}
+
+function cancelSession() {
   clearCaptureCap();
+  disarmStopKeys();
   kind = null;
   pcmChunks = [];
   phase = 'idle';
@@ -194,7 +245,18 @@ function cancelToggle() {
 }
 
 function onPcmChunk(buf) {
-  if (kind) pcmChunks.push(Buffer.from(buf));
+  if (!kind) return;
+  const chunk = Buffer.from(buf);
+  pcmChunks.push(chunk);
+  // Chunks kommen ~alle 32ms (pcm-worklet.js) - der RMS-Check darauf ist die
+  // billigste vorhandene Stille-Erkennung (dieselbe Funktion, die den STT-Call
+  // auf reiner Stille verhindert). Kein eigener Timer noetig: solange das
+  // Mikrofon laeuft, kommen auch in Stille Chunks.
+  if (!isSilence(chunk)) { lastVoiceAt = Date.now(); return; }
+  if (Date.now() - lastVoiceAt >= SILENCE_STOP_MS) {
+    console.warn(`[voice] ${SILENCE_STOP_MS / 1000}s ohne Ton - beende Aufnahme.`);
+    finish();
+  }
 }
 
 // VAD-Events werden bewusst NICHT zum Sessionende genutzt (siehe Datei-
@@ -207,6 +269,7 @@ function onVadEvent() {}
 async function finish() {
   if (!kind) return;
   clearCaptureCap();
+  disarmStopKeys();
   const mode = kind;
   const durationMs = sessionStartedAt ? Date.now() - sessionStartedAt : 0;
   kind = null;
@@ -322,6 +385,7 @@ async function paste(text) {
 // Renderer-lokaler Fehler (z.B. getUserMedia abgelehnt).
 function onLocalError(text) {
   clearCaptureCap();
+  disarmStopKeys();
   kind = null;
   pcmChunks = [];
   phase = 'error';
@@ -348,7 +412,7 @@ function syncIdleBubble() {
 }
 
 module.exports = {
-  init, startHold, endHold, toggleFlow, cancelToggle,
+  init, startHold, endHold, abortHold, toggleFlow, cancelToggle,
   onPcmChunk, onVadEvent, onLocalError,
   isActive, getKind, syncIdleBubble,
 };

@@ -113,7 +113,7 @@ function dayLabel(iso) {
   return d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
-function modeLabel(mode) { return mode === 'toggle' ? 'Doppel-Tap' : 'Halten'; }
+function modeLabel(mode) { return mode === 'toggle' ? 'Ein/Aus' : 'Halten'; }
 
 function renderDictation() {
   const name = S.account.name || S.account.email.split('@')[0] || '';

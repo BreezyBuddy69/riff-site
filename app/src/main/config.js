@@ -22,9 +22,11 @@ const DEFAULTS = {
     // eine Kombi MIT Haupttaste umstellen (z.B. "Control+Alt+Space"), die
     // kollidiert nicht mit reinen Modifier-Synthesen.
     flowHold: 'Control+Alt',
-    // Mode B: zweimal kurz antippen startet, zweimal kurz antippen ODER
-    // Klick auf Haken/Kreuz in der Bubble beendet - laeuft ueber
-    // toggleWatcher.js, unabhaengig von flowHold konfigurierbar.
+    // Mode B: EINMAL kurz antippen startet, erneut antippen / Enter / Leer-
+    // taste / Klick auf Haken oder Kreuz in der Bubble beendet - laeuft ueber
+    // toggleWatcher.js, unabhaengig von flowHold konfigurierbar. War frueher
+    // ein Doppel-Tap (Nutzer-Feedback 2026-08-24: wurde nie zuverlaessig
+    // getroffen, siehe Kommentar-Kopf in toggleWatcher.js).
     flowToggle: 'Control+Alt+D',
   },
   voice: {

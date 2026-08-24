@@ -86,10 +86,11 @@ if (!app.requestSingleInstanceLock()) {
       cfgRef: cfg,
       onHoldStart: () => dictationRouter.startHold(),
       onHoldEnd: () => dictationRouter.endHold(),
+      onHoldAbort: () => dictationRouter.abortHold(),
     });
     toggleWatcher.start({
       cfgRef: cfg,
-      onDoubleTap: () => dictationRouter.toggleFlow(),
+      onTap: () => dictationRouter.toggleFlow(),
     });
     transformIssues = transforms.init({ cfgRef: cfg });
 
@@ -241,7 +242,7 @@ if (!app.requestSingleInstanceLock()) {
   ipcMain.on('voice:local-error', (_e, text) => dictationRouter.onLocalError(text));
   ipcMain.on('voice:devices', (_e, list) => voiceWindow.resolveDevices(list));
   // Haken/Kreuz-Klick im Toggle-Modus (Master-Prompt §6.6) - confirm nutzt
-  // denselben Pfad wie ein zweiter Doppel-Tap (dictationRouter.toggleFlow
+  // denselben Pfad wie ein zweiter Shortcut-Druck (dictationRouter.toggleFlow
   // entscheidet anhand des Session-Zustands, nicht der Aufrufer).
   ipcMain.on('voice:toggle-confirm', () => dictationRouter.toggleFlow());
   ipcMain.on('voice:toggle-cancel', () => dictationRouter.cancelToggle());

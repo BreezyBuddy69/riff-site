@@ -2,7 +2,7 @@
   "name": "riff",
   "version": "0.1.0",
   "private": true,
-  "description": "Riff - Spracherkennung, die schneller ist als Tippen. Shortcut halten oder doppelt antippen, sprechen, loslassen.",
+  "description": "Riff - Spracherkennung, die schneller ist als Tippen. Shortcut halten oder einmal antippen, sprechen, loslassen.",
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",

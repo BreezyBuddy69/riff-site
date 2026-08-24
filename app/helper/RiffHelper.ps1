@@ -180,7 +180,13 @@ $CONFLICT_VK = @(0x10, 0x11, 0x12, 0x5B, 0x5C) +
   (0x30..0x39) + (0x41..0x5A) + (0x70..0x7B) +
   @(0x08, 0x09, 0x0D, 0x1B, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2E)
 
-function Test-KeysDown([string]$combo) {
+# $exclusive = $false liefert nur "alle Tasten der Kombination sind unten",
+# ohne den CONFLICT_VK-Scan - holdWatcher.js braucht beide Antworten, um
+# "losgelassen" von "eine dritte Taste ist dazugekommen" (fremder Shortcut,
+# z.B. Strg+Alt+D oder Strg+Alt+S) zu unterscheiden. Frueher sahen beide
+# Faelle identisch aus (down=$false) und ein fremder Shortcut hat deshalb ein
+# Diktat abgeschickt statt es zu verwerfen.
+function Test-KeysDown([string]$combo, [bool]$exclusive = $true) {
   $parts = $combo.ToLower().Split('+') | Where-Object { $_ -ne '' }
   $wanted = @()
   foreach ($p in $parts) {
@@ -193,6 +199,7 @@ function Test-KeysDown([string]$combo) {
   # Bubble kam bei jedem fremden Shortcut hoch, der den Hotkey enthaelt.
   # Der Scan laeuft nur, wenn die Kombination selbst schon unten ist, also
   # selten und kurz - im Leerlauf kostet er nichts.
+  if (-not $exclusive) { return $true }
   foreach ($other in $CONFLICT_VK) {
     if ($wanted -contains $other) { continue }
     if (([SableNative]::GetAsyncKeyState($other) -band 0x8000) -ne 0) { return $false }
@@ -529,7 +536,10 @@ function Handle-Request($req) {
         $state = [SableNative]::GetAsyncKeyState($VK[$k.ToLower()])
         return @{ down = (($state -band 0x8000) -ne 0); pressed = (($state -band 0x0001) -ne 0) }
       }
-      return @{ down = (Test-KeysDown $k) }
+      # raw = Kombination physisch unten (ohne Exklusiv-Scan), down = zusaetzlich
+      # keine Fremdtaste dabei. Der teure Scan laeuft nur, wenn raw schon wahr ist.
+      $raw = Test-KeysDown $k $false
+      return @{ down = ($raw -and (Test-KeysDown $k $true)); raw = $raw }
     }
     'mods_state' {
       # Seiten-aufgeschluesselter Modifier-Status (Latenz-Optimierung, siehe

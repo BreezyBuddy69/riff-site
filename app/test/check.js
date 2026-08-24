@@ -173,4 +173,68 @@ const entry = (over = {}) => ({
   assert.ok(!isHallucination('Kauf bitte Milch und Brot'), 'normaler Satz ist keine Halluzination');
 }
 
-console.log('OK — alle Pruefungen bestanden.');
+// --- Hotkey-Watcher: fremder Shortcut darf NIE abschicken ---------------------
+// Bug-Report 2026-08-24: "Strg+Alt+D bringt die Bubble kurz hoch und sie geht
+// sofort wieder weg" / "jeder andere Shortcut startet ein Diktat". Beide Faelle
+// haengen daran, dass eine dritte Taste frueher wie Loslassen aussah und die
+// Aufnahme ABGESCHICKT hat. Der Helper wird hier gestubbt - die Watcher haben
+// kein electron im require-Baum, laufen also unter nacktem Node.
+const helper = require('../src/main/helper');
+const holdWatcher = require('../src/main/voice/holdWatcher');
+const toggleWatcher = require('../src/main/voice/toggleWatcher');
+
+const watcherCfg = {
+  hotkeys: { flowHold: 'Control+Alt', flowToggle: 'Control+Alt+D' },
+  voice: { enabled: true },
+};
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+(async () => {
+  let state = { down: false, raw: false };
+  helper.request = async (op) => (op === 'key_state' ? state : {});
+
+  const log = [];
+  holdWatcher.start({
+    cfgRef: watcherCfg,
+    onHoldStart: () => { log.push('start'); return true; },
+    onHoldEnd: () => log.push('end'),
+    onHoldAbort: () => log.push('abort'),
+  });
+
+  state = { down: true, raw: true };          // Strg+Alt allein unten
+  await sleep(400);                            // > HOLD_START_MS
+  assert.deepEqual(log, ['start'], 'gehaltenes Strg+Alt startet eine Hold-Session');
+
+  state = { down: false, raw: true };          // dritte Taste kommt dazu (z.B. D oder S)
+  await sleep(150);
+  assert.deepEqual(log, ['start', 'abort'], 'Fremdtaste verwirft die Aufnahme, statt sie abzuschicken');
+
+  state = { down: false, raw: false };         // alles losgelassen
+  await sleep(150);
+  assert.deepEqual(log, ['start', 'abort'], 'nach dem Abbruch folgt kein zweites Ereignis');
+
+  state = { down: true, raw: true };           // erneut halten -> normaler Ablauf
+  await sleep(400);
+  state = { down: false, raw: false };
+  await sleep(150);
+  assert.deepEqual(log, ['start', 'abort', 'start', 'end'], 'echtes Loslassen schickt weiterhin ab');
+  holdWatcher.stop();
+
+  // --- Toggle: EIN kurzer Druck genuegt (frueher Doppel-Tap) ------------------
+  let taps = 0;
+  toggleWatcher.start({ cfgRef: watcherCfg, onTap: () => { taps++; } });
+  state = { down: true, raw: true };
+  await sleep(120);
+  state = { down: false, raw: false };
+  await sleep(120);
+  assert.equal(taps, 1, 'ein einzelner kurzer Druck meldet genau einen Tap');
+
+  state = { down: true, raw: true };           // langes Halten ist kein Tap
+  await sleep(900);
+  state = { down: false, raw: false };
+  await sleep(120);
+  assert.equal(taps, 1, 'langes Halten der Toggle-Kombi zaehlt nicht als Tap');
+  toggleWatcher.stop();
+
+  console.log('OK — alle Pruefungen bestanden.');
+})();

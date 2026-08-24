@@ -7,9 +7,18 @@
 // Zustandsmaschine:
 //   idle      --Kombination >= HOLD_START_MS ununterbrochen unten--> holding
 //   holding   --Kombination losgelassen--> idle (+ onHoldEnd)
+//   holding   --dritte Taste kommt dazu--> latched (+ onHoldAbort, KEIN Paste)
 //   latched   = Kombination ist unten, darf aber (noch) keine Session
-//               starten (zu kurz/abgelehnt) - wartet auf komplettes
-//               Loslassen, verhindert Dauerfeuer.
+//               starten (zu kurz/abgelehnt/abgebrochen) - wartet auf
+//               komplettes Loslassen, verhindert Dauerfeuer.
+//
+// Bug (2026-08-24): "Strg+Alt+D bringt die Bubble kurz hoch und sie geht
+// sofort wieder weg", ebenso bei jedem fremden Strg+Alt+X-Shortcut. Ursache:
+// key_state meldete nur EIN Bit (down, exklusiv gegen Fremdtasten) - sobald
+// eine dritte Taste dazukam, sah das exakt aus wie Loslassen und die Session
+// wurde ABGESCHICKT (STT-Call + Paste in die fremde App). Der Helper liefert
+// jetzt zusaetzlich raw (Kombi physisch unten, ohne Exklusiv-Scan): raw ohne
+// down = Fremdtaste -> verwerfen statt abschicken.
 //
 // HOLD_START_MS schuetzt vor AltGr: auf deutschen Tastaturen erzeugt AltGr
 // (fuer @ € { [ ...) OS-seitig Strg+Alt - ein normaler AltGr-Tastendruck ist
@@ -38,6 +47,7 @@ const POLL_ACTIVE_MS = 40; // reaktiv, sobald die Kombi unten ist / Session laeu
 let cfg = null;
 let onHoldStart = null;
 let onHoldEnd = null;
+let onHoldAbort = null;
 
 let timer = null;
 let downSince = 0; // 0 = Kombination ist oben
@@ -70,9 +80,11 @@ async function poll() {
   if (!keys) { reset(); schedule(POLL_IDLE_MS); return; }
 
   let down = false;
+  let raw = false;
   try {
     const r = await helper.request('key_state', { keys }, 1500);
     down = !!r.down;
+    raw = !!r.raw;
   } catch {
     // Helper kurz beschaeftigt/startet noch - naechster Poll versucht's wieder.
     schedule(holding ? POLL_ACTIVE_MS : POLL_IDLE_MS);
@@ -83,13 +95,25 @@ async function poll() {
     if (!downSince) {
       downSince = Date.now();
       holdThreshold = HOLD_START_MS; // sicherer Default, bis mods_state (falls angefragt) das Gegenteil bestaetigt
-      if (keys === 'ctrl+alt') checkAltGrFastPath();
+      if (keys === 'ctrl+alt' && !toggleExtendsHold(keys)) checkAltGrFastPath();
     }
     if (!holding && !latched && Date.now() - downSince >= holdThreshold) {
       const started = onHoldStart ? onHoldStart() : false;
       if (started) holding = true;
       else latched = true; // z.B. Assistent-Session aktiv - bis zum Loslassen ignorieren
     }
+    schedule(POLL_ACTIVE_MS);
+    return;
+  }
+
+  // Nicht mehr exklusiv unten, aber physisch noch unten: es ist eine dritte
+  // Taste dazugekommen (Strg+Alt+D, Strg+Alt+S in irgendeiner App, ...) - das
+  // ist bewusst KEIN Diktat. Laufende Aufnahme verwerfen, nicht abschicken,
+  // und bis zum kompletten Loslassen nichts Neues starten.
+  if (raw) {
+    if (holding && onHoldAbort) onHoldAbort();
+    holding = false;
+    latched = true;
     schedule(POLL_ACTIVE_MS);
     return;
   }
@@ -104,6 +128,16 @@ async function poll() {
 // die Links/Rechts-Belegung nach AltGr aussieht (siehe Kommentar oben an
 // HOLD_START_FAST_MS). askedAt verhindert, dass eine verspaetete Antwort noch
 // auf einen laengst losgelassenen/neu gedrueckten Tastendruck angewendet wird.
+// Der Fast-Path (50ms statt 250ms) darf nicht greifen, wenn der Toggle-Hotkey
+// die Hold-Kombi erweitert (Default: "ctrl+alt" steckt in "ctrl+alt+d") - sonst
+// startet schon das Anlegen von Strg+Alt eine Hold-Session, bevor das D ueber-
+// haupt unten ist, und die Bubble blitzt bei jedem Toggle-Druck kurz auf.
+function toggleExtendsHold(keys) {
+  const toggle = (cfg.hotkeys.flowToggle || '').trim().toLowerCase()
+    .replace(/control/g, 'ctrl').replace(/\s+/g, '');
+  return toggle.startsWith(`${keys}+`);
+}
+
 function checkAltGrFastPath() {
   const askedAt = downSince;
   helper.request('mods_state', {}, 500).then((m) => {
@@ -125,10 +159,11 @@ function schedule(ms) {
 
 // onHoldStart muss true zurueckgeben, wenn wirklich eine Session gestartet
 // wurde - sonst merkt sich der Watcher "abgelehnt" und wartet aufs Loslassen.
-function start({ cfgRef, onHoldStart: startFn, onHoldEnd: endFn }) {
+function start({ cfgRef, onHoldStart: startFn, onHoldEnd: endFn, onHoldAbort: abortFn }) {
   cfg = cfgRef;
   onHoldStart = startFn;
   onHoldEnd = endFn;
+  onHoldAbort = abortFn;
   if (!timer) schedule(POLL_IDLE_MS);
 }
 
