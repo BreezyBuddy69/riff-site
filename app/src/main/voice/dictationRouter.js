@@ -54,10 +54,13 @@ const SKIP_CLEANUP_MAX_WORDS = 300;
 // kein Text, kein Roundtrip, kein Verlaufseintrag.
 // ponytail: fester Schwellwert, keine Mikrofon-Kalibrierung - hochsetzen,
 // falls ein leiser Mikrofon-Pegel echte leise Sprache faelschlich verwirft.
-// isSilence/isSpeech/isHallucination sind reine Funktionen in silenceFilter.js
+// isSilence/isSpeech/trimSilence/stripHallucination sind reine Funktionen in
+// silenceFilter.js
 // (test/check.js prueft sie unter nacktem Node) - hier steht nur noch die
 // Pipeline, die sie verwendet.
-const { isSilence, isSpeech, isHallucination } = require('./silenceFilter');
+const {
+  isSilence, isSpeech, stripHallucination, trimSilence, HALLUCINATION_SILENCE_MS,
+} = require('./silenceFilter');
 
 let cfg = null;
 
@@ -290,7 +293,11 @@ async function finish() {
   }
 
   const dictionary = store.dictionary;
-  const asr = await speechRecognition.transcribe(cfg, buf, SAMPLE_RATE, {
+  // Stille vorne/hinten gar nicht erst hochladen - sie ist der Ausloeser fuer
+  // Whispers Schlussfloskeln (Bug-Report 2026-08-26: "am Ende sagt es einfach
+  // vielen Dank") und kostet nur Upload-Zeit.
+  const { audio, trailingSilenceMs } = trimSilence(buf, SAMPLE_RATE);
+  const asr = await speechRecognition.transcribe(cfg, audio, SAMPLE_RATE, {
     partial: false,
     prompt: speechRecognition.vocabularyPrompt(dictionary),
   });
@@ -301,7 +308,9 @@ async function finish() {
     scheduleHide(ERROR_HIDE_MS);
     return;
   }
-  if (isHallucination(asr.text)) {
+  // Auffangnetz, falls trotz Trim eine Floskel angehaengt wurde.
+  const text = stripHallucination(asr.text, trailingSilenceMs >= HALLUCINATION_SILENCE_MS);
+  if (!text) {
     phase = 'idle';
     sendUi();
     scheduleHide(IDLE_HIDE_MS);
@@ -313,7 +322,7 @@ async function finish() {
   // komplette zweite Netzwerk-Roundtrip wird uebersprungen, roher Text direkt
   // gepastet (groesster Hebel gegen die gefuehlte Diktier-Latenz bei kurzen
   // Kommandos).
-  const wordCount = asr.text.trim().split(/\s+/).length;
+  const wordCount = text.split(/\s+/).length;
   const category = appContext.categorize(sessionApp.app);
   const styles = store.styles;
   // autoCleanup aus: Rohtranskript wird gepastet (Nutzer will exakt das
@@ -324,10 +333,10 @@ async function finish() {
   // Diktaten faktisch nie greifen (Nutzer-Feedback: Korrektur "funktioniert
   // nicht beim Aufnehmen").
   const skipCleanup = styles.autoCleanup === false
-    || (wordCount <= SKIP_CLEANUP_MAX_WORDS && !appContext.matchesDictionary(dictionary, asr.text));
+    || (wordCount <= SKIP_CLEANUP_MAX_WORDS && !appContext.matchesDictionary(dictionary, text));
   const cleanedText = skipCleanup
-    ? asr.text
-    : (await transcriptCleanup.clean(cfg, asr.text, appContext.cleanupExtras(styles, category, dictionary, asr.text))).text;
+    ? text
+    : (await transcriptCleanup.clean(cfg, text, appContext.cleanupExtras(styles, category, dictionary, text))).text;
   license.recordWords(cfg, cleanedText);
   const pastedText = await paste(cleanedText);
 
@@ -347,8 +356,8 @@ async function finish() {
       text: pastedText.trim(),
       words: (pastedText.match(/\S+/g) || []).length,
       durationMs,
-      fixes: skipCleanup ? 0 : insights.countFixes(asr.text, cleanedText),
-      dictFixes: skipCleanup ? 0 : insights.countDictFixes(asr.text, cleanedText, dictionary),
+      fixes: skipCleanup ? 0 : insights.countFixes(text, cleanedText),
+      dictFixes: skipCleanup ? 0 : insights.countDictFixes(text, cleanedText, dictionary),
     });
     store.learnWords(cleanedText, dictionary);
     appWindow.notifyDataChanged();

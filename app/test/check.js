@@ -9,7 +9,9 @@ const insights = require('../src/main/insights');
 const { resolveDictation, applySnippets } = require('../src/main/voice/dictationEngine');
 const { categorize, cleanupExtras, matchesDictionary } = require('../src/main/appContext');
 const { parseAccelerator, hotkeyLabel, savingsHoursPerWeek } = require('../src/renderer/app/onboardingLogic');
-const { isSilence, isSpeech, isHallucination } = require('../src/main/voice/silenceFilter');
+const {
+  isSilence, isSpeech, isHallucination, stripHallucination, trimSilence,
+} = require('../src/main/voice/silenceFilter');
 const { vocabularyPrompt } = require('../src/main/voice/speechRecognition');
 
 function pcm(samples) {
@@ -171,6 +173,53 @@ const entry = (over = {}) => ({
   assert.ok(isHallucination("Danke fürs Zuschauen"), 'Apostroph-lose Variante matcht die Listenform');
   assert.ok(!isHallucination('Vielen Dank für die Info, ruf mich zurück'), 'echter Satz MIT der Phrase wird nie unterdrückt');
   assert.ok(!isHallucination('Kauf bitte Milch und Brot'), 'normaler Satz ist keine Halluzination');
+
+  // Bug-Report 2026-08-26: "am Ende sagt es einfach vielen Dank" - die Floskel
+  // haengt HINTEN an einem echten, langen Diktat, der Ganztext-Vergleich oben
+  // greift dort nie.
+  const diktat = 'Bitte schick mir die Unterlagen morgen früh.';
+  assert.equal(
+    stripHallucination(`${diktat} Vielen Dank.`, true),
+    diktat,
+    'angehaengte Floskel faellt weg, wenn die Aufnahme still endete',
+  );
+  assert.equal(
+    stripHallucination(`${diktat} Vielen Dank.`, false),
+    `${diktat} Vielen Dank.`,
+    'direkt nach dem Sprechen gestoppt -> echtes Schluss-Danke bleibt stehen',
+  );
+  assert.equal(
+    stripHallucination(`${diktat} Untertitel der Amara.org-Community`, false),
+    diktat,
+    'nie-gesprochene Phrase faellt immer, auch ohne Stille davor',
+  );
+  assert.equal(
+    stripHallucination(`${diktat} Vielen Dank. Bis zum nächsten Mal.`, true),
+    diktat,
+    'zwei aufeinanderfolgende Floskeln werden beide entfernt',
+  );
+  assert.equal(stripHallucination('Vielen Dank!', false), '', 'Floskel als ganzes Transkript faellt immer');
+  assert.equal(
+    stripHallucination('Vielen Dank für die Info, ruf mich zurück', true),
+    'Vielen Dank für die Info, ruf mich zurück',
+    'echter Satz MIT der Phrase wird nie angeschnitten',
+  );
+  assert.equal(stripHallucination('Kauf bitte Milch und Brot', true), 'Kauf bitte Milch und Brot', 'normaler Satz bleibt unveraendert');
+}
+
+// --- Stille am Anfang/Ende wird gar nicht erst hochgeladen -------------------
+// Ursache der Floskel-Halluzination: Whisper bekommt Stille zu hoeren und
+// erfindet Text. Was nicht mitfaehrt, kann nichts ausloesen.
+{
+  const s = new Array(16000 * 3).fill(0);          // 3s gesamt
+  for (let i = 16000; i < 16000 + 8000; i++) s[i] = 12000; // Sprache von 1.0s bis 1.5s
+  const { audio, trailingSilenceMs } = trimSilence(pcm(s), 16000);
+  const keptMs = (audio.length >> 1) / 16000 * 1000;
+  assert.ok(keptMs > 500 && keptMs < 1100, `Sprache + je 250ms Rand bleiben uebrig, nicht 3s (war ${keptMs}ms)`);
+  assert.ok(trailingSilenceMs > 1400, `Schluss-Stille wird gemeldet (war ${trailingSilenceMs}ms)`);
+
+  const nurStille = trimSilence(pcm(new Array(16000).fill(0)), 16000);
+  assert.equal(nurStille.audio.length, 32000, 'reine Stille wird unveraendert durchgereicht statt geleert');
 }
 
 // --- Hotkey-Watcher: fremder Shortcut darf NIE abschicken ---------------------

@@ -365,3 +365,41 @@ Denkpause mitten im Satz darf nie beenden) bleibt unangetastet.
 Regression-Check in `test/check.js` (`npm test`, stubbt `helper.request`, laeuft
 unter nacktem Node): Fremdtaste waehrend Hold → `abort`, echtes Loslassen →
 `end`, ein kurzer Toggle-Druck → genau ein Tap, langes Halten → kein Tap.
+
+---
+
+## 2026-08-26 — "Vielen Dank" am Ende eines langen Diktats
+
+Nutzer-Report: nach einem laengeren Diktat stand hinter dem echten Text noch
+ein "Vielen Dank." Der Filter aus 2026-07-30 konnte das nie fangen — er
+verglich das **ganze** Transkript mit der Phrasenliste und liess ein
+angehaengtes Schlusswort per Definition durch.
+
+**Ursache, nicht Symptom:** Whisper erfindet diese Floskeln auf **Stille**
+(Untertitel-Trainingsdaten). Die Stille zwischen dem letzten gesprochenen Wort
+und dem Stopp-Druck fuhr bisher bei jedem Diktat mit hoch. `trimSilence()` in
+`silenceFilter.js` schneidet sie vorne und hinten weg (Frame-RMS, 250ms Rand,
+damit leise An-/Auslaute bleiben) — was nicht hochgeladen wird, kann nichts
+ausloesen. Nebeneffekt: weniger Upload, also schnelleres Diktat.
+
+**Auffangnetz** `stripHallucination()` ersetzt `isHallucination()` und prueft
+den letzten Satz statt das ganze Transkript. Zwei Listen, weil "Vielen Dank"
+kein sauberes Signal ist:
+
+- `NEVER_SPOKEN` ("Untertitel der Amara.org-Community", "Danke fuers
+  Zuschauen", …) — faellt immer, das diktiert niemand.
+- `AMBIGUOUS_PHRASES` ("Vielen Dank", "Tschuess", …) — als **ganzes**
+  Transkript immer weg (wie bisher), als Schlusssatz nur, wenn die Aufnahme
+  davor >= 1,5s still war. Sonst wuerde eine diktierte Mail, die echt mit
+  "Vielen Dank." endet, still um ihren Gruss gekuerzt — der teurere Fehler.
+
+Satzgrenze ist Satzzeichen **plus** Leerraum, damit "Amara.org" ein Wort
+bleibt; Satzzeichen werden beim Normalisieren zu Leerraum, nicht geloescht.
+
+`raw` im Verlauf bleibt das ungekuerzte Whisper-Ergebnis — sonst waere im
+Nachhinein nicht mehr zu sehen, dass ueberhaupt etwas entfernt wurde.
+
+Regression-Check in `test/check.js`: angehaengte Floskel nach Stille faellt,
+dieselbe Floskel ohne Stille davor bleibt, "Vielen Dank fuer die Info, ruf
+mich zurueck" wird nie angeschnitten, 3s Aufnahme mit 0,5s Sprache schrumpft
+auf ~1s.
