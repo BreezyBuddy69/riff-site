@@ -357,6 +357,7 @@ $('autoCleanup').addEventListener('change', async (e) => {
 
 function renderTransforms() {
   $('transformsEnabled').checked = S.config.transforms.enabled;
+  $('veAccel').value = S.config.transforms.voiceEditAccelerator || '';
 
   const issues = $('transformIssues');
   if (S.config.transforms.enabled && S.transformIssues.length) {
@@ -417,6 +418,12 @@ function openTransformEditor(id) {
 $('transformsEnabled').addEventListener('change', async (e) => {
   apply(await window.riff.save({ transforms: { enabled: e.target.checked } }));
   if (e.target.checked && S.transformIssues.length) toast('Manche Hotkeys sind belegt.');
+});
+
+$('veSave').addEventListener('click', async () => {
+  apply(await window.riff.save({ transforms: { voiceEditAccelerator: $('veAccel').value.trim() } }));
+  apply(await window.riff.refreshTransforms());
+  toast('Voice-Edit-Hotkey gespeichert.');
 });
 
 $('tfCancel').addEventListener('click', () => { editingTransform = null; renderTransforms(); });
@@ -681,7 +688,9 @@ const heldMods = new Set();
 const maxMods = new Set();
 let releaseTimer = null;
 
-function metaName(targetId) { return targetId === 'tfAccel' ? 'Super' : 'Win'; }
+// tfAccel/veAccel gehen beide ueber Electrons globalShortcut ("Super"), die
+// Diktat-Hotkeys (flowHold/flowToggle) ueber RiffHelper ("Win").
+function metaName(targetId) { return (targetId === 'tfAccel' || targetId === 'veAccel') ? 'Super' : 'Win'; }
 
 function mainKeyName(e) {
   if (/^Key[A-Z]$/.test(e.code)) return e.code.slice(3);
@@ -737,8 +746,9 @@ function onRecordKeyup(e) {
     const target = recordingTarget;
     releaseTimer = setTimeout(() => {
       // Reine Modifier-Kombi ("Control+Alt") ist nur fuer die Diktat-Hotkeys
-      // sinnvoll - Electrons globalShortcut braucht immer eine Haupttaste.
-      if (recordingTarget && target !== 'tfAccel') finalizeRecording(comboOf(target, ''));
+      // sinnvoll - Electrons globalShortcut (tfAccel/veAccel) braucht immer
+      // eine Haupttaste.
+      if (recordingTarget && target !== 'tfAccel' && target !== 'veAccel') finalizeRecording(comboOf(target, ''));
     }, RELEASE_GRACE_MS);
   }
 }

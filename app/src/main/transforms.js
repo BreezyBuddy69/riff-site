@@ -140,6 +140,73 @@ async function runOnSelection(transformId) {
   }
 }
 
+const VOICE_EDIT_SYSTEM_PROMPT = 'Rewrite the given text by exactly following the spoken instruction. '
+  + 'Keep the original language unless the instruction explicitly asks for another one. '
+  + 'Output only the rewritten text, no commentary, no quotes around it.';
+
+// Auswahl + gesprochene Anweisung sind da - LLM-Call + Zurueckschreiben, exakt
+// der zweite Teil von runOnSelection() oben, nur mit gesprochenem statt festem
+// Prompt. Eigene Funktion statt Inline-Callback, damit runVoiceEdit() unten
+// nicht durch verschachtelte try/finally unlesbar wird.
+async function processVoiceEdit(instruction, selectedText, prevClipboard) {
+  if (!instruction || !instruction.trim()) {
+    if (prevClipboard) clipboard.writeText(prevClipboard);
+    voiceWindow.hide();
+    return;
+  }
+  showBubble('thinking');
+  const res = await llm.chat(cfg, {
+    system: VOICE_EDIT_SYSTEM_PROMPT,
+    user: `Anweisung: ${instruction}\n\nText:\n${selectedText}`,
+    temperature: 0.4,
+    maxTokens: 2048,
+    timeoutMs: 20000,
+  });
+  if (!res.ok) {
+    if (prevClipboard) clipboard.writeText(prevClipboard);
+    showBubble('error', 'Voice Edit fehlgeschlagen. Später erneut versuchen.');
+    hideBubble(ERROR_HIDE_MS);
+    return;
+  }
+  await typingEngine.typeText(res.text);
+  setTimeout(() => {
+    try { if (prevClipboard) clipboard.writeText(prevClipboard); } catch { /* Zwischenablage gesperrt */ }
+  }, 700);
+  showBubble('idle');
+  hideBubble(IDLE_HIDE_MS);
+}
+
+// Voice Edit: Auswahl greifen (wie runOnSelection), dann per dictationRouters
+// dritter Session-Art eine gesprochene Anweisung aufnehmen ("kürzer", "auf
+// Englisch", "förmlicher") und damit die Auswahl umschreiben - Wispr-Flow-
+// Edit-Pendant zu den Presets oben, nur mit frei gesprochener statt fest
+// hinterlegter Anweisung. Zweiter Hotkey-Druck (oder Enter/Leertaste) beendet
+// die Aufnahme, siehe dictationRouter.js Mode C.
+async function runVoiceEdit() {
+  if (dictationRouter.getKind() === 'voice-edit') { dictationRouter.endVoiceEdit(); return; }
+  if (busy || dictationRouter.isActive()) return;
+  busy = true;
+  showBubble('thinking');
+  const grabbed = await grabSelection();
+  if (!grabbed.text) {
+    if (grabbed.prev) clipboard.writeText(grabbed.prev);
+    showBubble('error', 'Kein Text markiert — erst markieren, dann Voice Edit drücken.');
+    hideBubble(ERROR_HIDE_MS);
+    busy = false;
+    return;
+  }
+  const started = dictationRouter.startVoiceEdit((instruction) => {
+    processVoiceEdit(instruction, grabbed.text, grabbed.prev).finally(() => { busy = false; });
+  });
+  if (!started) {
+    // Kein Fehlerhinweis hier: beginSession() zeigt bei Wochenlimit selbst
+    // eine Bubble, bei deaktiviertem Diktieren bleibt Riff app-weit still
+    // (gleiches Verhalten wie holdWatcher/toggleWatcher in diesem Fall).
+    if (grabbed.prev) clipboard.writeText(grabbed.prev);
+    busy = false;
+  }
+}
+
 // Hotkeys neu setzen (beim Start und nach jeder Aenderung in der Oberflaeche).
 // Rueckgabe: Liste der Transforms, deren Kombination Windows/eine andere App
 // schon belegt hat - die Oberflaeche zeigt das an, statt es zu verschlucken.
@@ -160,6 +227,18 @@ function refreshShortcuts() {
       else failed.push({ id: t.id, name: t.name, accelerator: t.accelerator });
     } catch (err) {
       failed.push({ id: t.id, name: t.name, accelerator: t.accelerator, error: err.message });
+    }
+  }
+  // Voice Edit ist kein Eintrag in der nutzerdefinierten transforms-Liste
+  // (kein fester Prompt) - eigener Accelerator aus cfg.transforms, aber
+  // dieselbe Registrierung + dieselbe "belegt"-Meldung wie die Presets oben.
+  const veAccel = cfg.transforms.voiceEditAccelerator;
+  if (veAccel) {
+    try {
+      if (globalShortcut.register(veAccel, () => runVoiceEdit())) registered.push(veAccel);
+      else failed.push({ id: 'voice-edit', name: 'Voice Edit', accelerator: veAccel });
+    } catch (err) {
+      failed.push({ id: 'voice-edit', name: 'Voice Edit', accelerator: veAccel, error: err.message });
     }
   }
   // Ein Hotkey, der sich still nicht registriert, ist genau die Fehlerart, die

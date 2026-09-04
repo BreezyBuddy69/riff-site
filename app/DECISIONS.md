@@ -403,3 +403,61 @@ Regression-Check in `test/check.js`: angehaengte Floskel nach Stille faellt,
 dieselbe Floskel ohne Stille davor bleibt, "Vielen Dank fuer die Info, ruf
 mich zurueck" wird nie angeschnitten, 3s Aufnahme mit 0,5s Sprache schrumpft
 auf ~1s.
+
+## 2026-09-04 — Voice Edit: Auswahl markieren, Anweisung sprechen, umschreiben
+
+Nutzerwunsch: ein Transform, dessen Anweisung nicht fest hinterlegt ist,
+sondern bei jedem Aufruf frei gesprochen wird ("kuerzer", "auf Englisch",
+"foermlicher") - Wispr-Flow-Edit-Pendant zu den festen Presets ("Polish",
+"Prompt Engineer").
+
+**D39 — Voice Edit als dritte dictationRouter-Session-Art statt eigenes
+Aufnahme-System.** `dictationRouter.js` kannte bisher genau zwei Session-Arten
+(`hold`/`toggle`) und war fest verdrahtet, das Transkript am Ende IMMER zu
+saeubern+pasten. Eine dritte Art `voice-edit` haengt sich an dieselbe
+Aufnahme-/STT-Pipeline (Mikrofon, Whisper, Stille-/Halluzinations-Filter,
+Wochenlimit-Check) - `finish()` ueberspringt fuer sie Cleanup/Paste/Verlauf
+komplett und reicht das rohe Transkript stattdessen an einen Callback durch,
+den `transforms.js` beim Start uebergibt (`startVoiceEdit(onText)`). Grund
+gegen ein komplett eigenes Aufnahme-System: die gesamte Mikrofon-/Renderer-
+IPC-Verdrahtung (`voice:pcm` etc., main.js) ist global auf GENAU einen
+Consumer (dictationRouter) verdrahtet - ein zweiter Consumer haette diese
+Verdrahtung verdoppelt, statt eine Session-Art zu ergaenzen.
+
+**Ablauf (transforms.js `runVoiceEdit()`):** Hotkey (Default `Alt+Shift+V`,
+eigenes Feld in den Transform-Einstellungen, NICHT Teil der
+nutzerdefinierten transforms-Liste, weil kein fester Prompt existiert) →
+Auswahl greifen (derselbe `grabSelection()`-Weg wie die Presets, Ctrl+C +
+Zwischenablage-Polling) → `dictationRouter.startVoiceEdit()` startet die
+Aufnahme, Bubble zeigt "listening" → zweiter Hotkey-Druck (oder Enter/
+Leertaste, wie Toggle-Diktat) beendet sie → Transkript kommt als Anweisung
+zurueck → EIN LLM-Call (`llm.chat`, derselbe Zwei-Routen-Pfad wie Cleanup/
+Presets: eigener OpenRouter-Key oder n8n-Fallback `sable-chat` - **kein
+n8n-Workflow musste geaendert werden**, der Webhook nimmt beliebige
+system/user-Prompts entgegen) mit System-Prompt "schreibe den Text exakt nach
+der Anweisung um" + `Anweisung: … / Text: …` als User-Message → Ergebnis wird
+per `typingEngine.typeText()` ueber die Auswahl gepastet, Zwischenablage
+danach auf den Original-Inhalt des Nutzers zurueckgesetzt (identisch zu den
+Presets).
+
+**Kein Klick-Icon zum Beenden.** Die Toggle-Bubble-Groesse mit Haken/Kreuz
+haengt an fest verdrahteter `kind === 'toggle'`-Semantik in `voice:toggle-
+confirm`/`-cancel` (main.js/dictationRouter.js) - ein Klick waere bei
+`kind === 'voice-edit'` wirkungslos verpufft. Bewusst NICHT mitgezogen (haette
+die IPC-Handler kind-generisch machen muessen, fuer eine zweite
+Beendigungs-Option, die es mit Enter/Leertaste/zweitem Hotkey-Druck schon
+gibt) - Voice Edit bekommt die schmale "normal"-Bubble ohne Buttons.
+
+**Vier Ausstiegspunkte in `finish()`, nicht einer.** Stille erkannt, STT
+fehlgeschlagen, Transkript nach Halluzinations-Filter leer, echter Text da -
+jeder davon braucht seinen eigenen `finishVoiceEdit(text)`-Aufruf, sonst
+bleibt `transforms.js`s `busy`-Flag fuer immer haengen (der Callback waere nie
+gekommen). Fuenfter Pfad `onLocalError` (Mikrofon-Berechtigung abgelehnt)
+ebenfalls nachgezogen - vorher haette ein verweigerter Mikrofon-Zugriff
+waehrend Voice Edit Riff bis zum Neustart "busy" gelassen.
+
+Kein Regression-Check in `test/check.js`: `dictationRouter.js`/`transforms.js`
+haben `electron` im require-Baum (globalShortcut/clipboard), laufen also nicht
+unter nacktem Node - wie beim Rest dieser beiden Dateien ist der echte
+`npm start`-Boot der Pruef-Weg (verifiziert: Hotkey registriert sich sauber
+neben den bestehenden Presets, keine Kollision, kein Crash beim Laden).

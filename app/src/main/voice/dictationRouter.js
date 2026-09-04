@@ -64,7 +64,7 @@ const {
 
 let cfg = null;
 
-let kind = null;       // 'hold' | 'toggle' | null (keine aktive Session)
+let kind = null;       // 'hold' | 'toggle' | 'voice-edit' | null (keine aktive Session)
 let phase = 'idle';    // 'idle' | 'listening' | 'thinking' | 'error'
 let pcmChunks = [];
 let hideTimer = null;
@@ -75,6 +75,11 @@ let captureCapTimer = null;
 let sessionStartedAt = 0;
 let sessionApp = { app: '', title: '' };
 let lastVoiceAt = 0; // letzter PCM-Chunk mit Pegel ueber der Stille-Schwelle
+// Voice Edit (transforms.js): dritter Session-Typ neben hold/toggle. Statt
+// zu pasten liefert finish() das rohe Transkript an diesen Callback -
+// transforms.js macht daraus die Anweisung fuer den LLM-Umschreib-Call auf
+// eine vorher gegriffene Auswahl.
+let voiceEditCallback = null;
 
 function isActive() { return kind !== null; }
 function getKind() { return kind; }
@@ -134,7 +139,10 @@ const STOP_ACCELERATORS = ['Return', 'Space'];
 function armStopKeys() {
   for (const accel of STOP_ACCELERATORS) {
     try {
-      globalShortcut.register(accel, () => { if (kind === 'toggle') finish(); });
+      // Voice Edit ist ebenfalls ein Toggle-artiger zweiter Druck zum Beenden
+      // (siehe transforms.js: der Hotkey wird zweimal gedrueckt, kein eigener
+      // dritter Accelerator noetig) - deshalb hier mitbehandelt.
+      globalShortcut.register(accel, () => { if (kind === 'toggle' || kind === 'voice-edit') finish(); });
     } catch (err) {
       console.warn(`[voice] Stopp-Taste ${accel} nicht registrierbar:`, err.message);
     }
@@ -171,7 +179,12 @@ function beginSession(newKind) {
     () => {},
   );
   armCaptureCap();
-  if (newKind === 'toggle') armStopKeys();
+  // Voice Edit stoppt wie Toggle per Enter/Leertaste oder zweitem Hotkey-
+  // Druck (transforms.js), bekommt aber bewusst NICHT die klickbaren Haken/
+  // Kreuz-Icons unten - die haengen an der 'toggle'-Kind-Semantik von
+  // voice:toggle-confirm/-cancel, ein Klick wuerde bei kind='voice-edit'
+  // wirkungslos verpuffen.
+  if (newKind === 'toggle' || newKind === 'voice-edit') armStopKeys();
   // Toggle-Bubble bekommt Haken/Kreuz-Icons und braucht dafuer die breitere
   // 'toggle'-Groesse + wird dafuer kurz klickbar - Hold-Bubble bleibt bei
   // 'normal' und immer click-through (Master-Prompt §6.6). bubbleEnabled
@@ -218,6 +231,16 @@ function toggleFlow() {
   if (kind === 'toggle') finish();
   else beginSession('toggle');
 }
+
+// ---------- Mode C: Voice Edit (transforms.js) ----------
+// onText bekommt das rohe Transkript (nie Cleanup/Paste/Verlauf - das macht
+// transforms.js selbst, kombiniert mit der vorher gegriffenen Auswahl).
+function startVoiceEdit(onText) {
+  if (kind) return false;
+  voiceEditCallback = onText;
+  return beginSession('voice-edit');
+}
+function endVoiceEdit() { if (kind === 'voice-edit') finish(); }
 
 // Kreuz-Klick in der Bubble (Master-Prompt §6.6/§6.1) - Aufnahme verwerfen,
 // NICHT verarbeiten. Nur fuer Mode B sinnvoll (Mode A hat keine Buttons).
@@ -275,6 +298,14 @@ async function finish() {
   disarmStopKeys();
   const mode = kind;
   const durationMs = sessionStartedAt ? Date.now() - sessionStartedAt : 0;
+  // Voice Edit ueberspringt Cleanup/Paste/Verlauf komplett - der Aufrufer
+  // (transforms.js) bekommt einfach das (ggf. leere) Transkript zurueck und
+  // entscheidet selbst, was ein leeres Ergebnis bedeutet.
+  const finishVoiceEdit = (resultText) => {
+    const cb = voiceEditCallback;
+    voiceEditCallback = null;
+    if (cb) cb(resultText || '');
+  };
   kind = null;
   phase = 'thinking';
   voiceWindow.setInteractive(false);
@@ -289,6 +320,7 @@ async function finish() {
     phase = 'idle';
     sendUi();
     scheduleHide(IDLE_HIDE_MS);
+    if (mode === 'voice-edit') finishVoiceEdit('');
     return;
   }
 
@@ -306,6 +338,7 @@ async function finish() {
     voiceWindow.resize('error');
     sendUi({ errorText: 'Spracherkennung fehlgeschlagen. Bitte später erneut versuchen.' });
     scheduleHide(ERROR_HIDE_MS);
+    if (mode === 'voice-edit') finishVoiceEdit('');
     return;
   }
   // Auffangnetz, falls trotz Trim eine Floskel angehaengt wurde.
@@ -314,6 +347,14 @@ async function finish() {
     phase = 'idle';
     sendUi();
     scheduleHide(IDLE_HIDE_MS);
+    if (mode === 'voice-edit') finishVoiceEdit('');
+    return;
+  }
+  if (mode === 'voice-edit') {
+    phase = 'idle';
+    sendUi();
+    scheduleHide(IDLE_HIDE_MS);
+    finishVoiceEdit(text);
     return;
   }
 
@@ -395,6 +436,7 @@ async function paste(text) {
 function onLocalError(text) {
   clearCaptureCap();
   disarmStopKeys();
+  const wasVoiceEdit = kind === 'voice-edit';
   kind = null;
   pcmChunks = [];
   phase = 'error';
@@ -403,6 +445,13 @@ function onLocalError(text) {
   voiceWindow.resize('error');
   sendUi({ errorText });
   scheduleHide(ERROR_HIDE_MS);
+  // Sonst bliebe transforms.js' runVoiceEdit() fuer immer "busy", weil ihr
+  // Callback nie aufgerufen wuerde.
+  if (wasVoiceEdit) {
+    const cb = voiceEditCallback;
+    voiceEditCallback = null;
+    if (cb) cb('');
+  }
 }
 
 function init({ cfgRef }) {
@@ -422,6 +471,7 @@ function syncIdleBubble() {
 
 module.exports = {
   init, startHold, endHold, abortHold, toggleFlow, cancelToggle,
+  startVoiceEdit, endVoiceEdit,
   onPcmChunk, onVadEvent, onLocalError,
   isActive, getKind, syncIdleBubble,
 };

@@ -95,6 +95,10 @@ const DEFAULTS = {
   // Zustimmung, deshalb Default false ("Opt in" wie im Vorbild).
   transforms: {
     enabled: false,
+    // Voice Edit (transforms.js): Auswahl greifen, Anweisung dazu sprechen,
+    // Auswahl wird damit umgeschrieben. Eigener fester Hotkey statt Teil der
+    // nutzerdefinierten transforms-Liste, weil er keinen festen Prompt hat.
+    voiceEditAccelerator: 'Alt+Shift+V',
   },
   // weekStart = Montag 00:00 UTC der aktuellen Kontingent-Woche (ISO-String,
   // leer beim allerersten Start). license.currentQuota() rollt das still
