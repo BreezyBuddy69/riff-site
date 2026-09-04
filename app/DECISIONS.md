@@ -411,7 +411,18 @@ sondern bei jedem Aufruf frei gesprochen wird ("kuerzer", "auf Englisch",
 "foermlicher") - Wispr-Flow-Edit-Pendant zu den festen Presets ("Polish",
 "Prompt Engineer").
 
-**D39 — Voice Edit als dritte dictationRouter-Session-Art statt eigenes
+**D39 ist SUPERSEDED durch D40 weiter unten - beim Lesen ueberspringen, nur
+als Historie stehen gelassen.** Der eigene Hotkey (Alt+Shift+V, zweiter Druck
+zum Beenden) war im echten Test noch am selben Tag die Fehlerursache: Nutzer
+hat einmal gedrueckt, gesprochen, aber nie ein zweites Mal gedrueckt/Enter
+gedrueckt - die Aufnahme lief einfach im Hintergrund weiter, nichts geschah.
+Nutzer-Feedback direkt danach: "kein extra Shortcut", "muss nur markieren".
+D40 ersetzt den ganzen Mechanismus unten (Session-Art `voice-edit`,
+`startVoiceEdit`/`endVoiceEdit`, `voiceEditAccelerator` in config.js,
+`veAccel`-Feld in den Settings) ersatzlos - nichts davon existiert im Code
+mehr, hier nur als Lehre dokumentiert.
+
+**D39 (Historie) — Voice Edit als dritte dictationRouter-Session-Art statt eigenes
 Aufnahme-System.** `dictationRouter.js` kannte bisher genau zwei Session-Arten
 (`hold`/`toggle`) und war fest verdrahtet, das Transkript am Ende IMMER zu
 saeubern+pasten. Eine dritte Art `voice-edit` haengt sich an dieselbe
@@ -461,3 +472,57 @@ haben `electron` im require-Baum (globalShortcut/clipboard), laufen also nicht
 unter nacktem Node - wie beim Rest dieser beiden Dateien ist der echte
 `npm start`-Boot der Pruef-Weg (verifiziert: Hotkey registriert sich sauber
 neben den bestehenden Presets, keine Kollision, kein Crash beim Laden).
+
+## 2026-09-04, selber Tag — D40: Voice Edit ohne eigenen Hotkey
+
+**Neuer Ansatz: die Auswahl selbst ist das Signal, kein zweiter Tastendruck,
+kein neuer Hotkey.** Normal diktieren (Hold ODER Toggle, die schon bekannten
+Hotkeys) - ist beim Stoppen im selben Feld/derselben App etwas markiert, gilt
+das gerade Diktierte automatisch als Umschreib-Anweisung dafuer statt als
+einzufuegender Text. Nichts markiert: unveraendertes Verhalten wie eh und je.
+
+**Wo der Code jetzt sitzt:** `dictationRouter.js`s `finish()` greift NACH dem
+fertigen Transkript (`cleanedText` steht schon) per `grabSelection()` die
+aktuelle Auswahl. Nicht-leer → EIN LLM-Call (`Anweisung: <cleanedText> / Text:
+<Auswahl>`, derselbe `llm.chat`-Pfad wie zuvor) → Ergebnis ersetzt die
+Auswahl, Zwischenablage wird zurueckgesetzt. Leer → `paste(cleanedText)` wie
+im Ur-Code, komplett unveraendert. `grabSelection()`/`waitForModifiersUp()`
+wanderten aus transforms.js in ein neues gemeinsames Modul
+`voice/selectionGrab.js` (DRY - dieselbe Logik, jetzt zwei Aufrufer:
+transforms.js fuer die festen Presets, dictationRouter.js hier).
+
+**Warum der Grab-Zeitpunkt wichtig ist:** Ctrl+C waehrend eine Hold-Session
+noch laeuft (Nutzer haelt die Hotkey-Tasten physisch gedrueckt) kaeme beim
+Ziel verstuemmelt an (Ctrl+Alt+C statt Ctrl+C, D-Lehre aus der Transforms-
+Datei) - deshalb der Grab konsequent ERST in `finish()`, NACHDEM die Session
+schon vorbei ist und die Modifier-Tasten garantiert losgelassen sind. Ein
+Versuch, das waehrend der Aufnahme parallel/verdeckt zu machen (waere fuer den
+Toggle-Modus theoretisch latenzfrei gewesen, weil dort nur kurz angetippt
+wird), wurde verworfen: fuer den Hold-Modus haette das synthetische Tasten an
+die fokussierte App gesendet, WAEHREND der Nutzer noch die Hotkey-Kombination
+haelt - Risiko unbeabsichtigter Seiteneffekte in fremden Apps war hoeher als
+der Latenzgewinn wert.
+
+**Der bewusst in Kauf genommene Latenz-Kompromiss:** JEDES Diktat - nicht nur
+welche mit Auswahl - macht jetzt nach der Transkription einen zusaetzlichen
+Ctrl+C-Zwischenablage-Check. Um den haeufigeren "nichts markiert"-Fall nicht
+unnoetig zu verlangsamen, hat `grabSelection()` jetzt einen `timeoutMs`-
+Parameter: transforms.js (expliziter Hotkey-Druck) behaelt den vollen
+Timeout (720ms), dictationRouter.js (jedes einzelne Diktat) nutzt 300ms.
+NICHT gemessen, ob 300ms bei normalen Diktaten spuerbar ist - falls ja, ist
+das der erste Hebel (weiter runter, oder ganz auf Ereignis-getriebene
+Erkennung umsteigen, falls die Helper-API das je hergibt).
+
+**Fehlerfall bewusst nicht-destruktiv:** schlaegt der LLM-Call fehl, wird
+NICHTS auf die Auswahl gepastet (sonst stuende da ploetzlich die rohe
+Anweisung statt des Originaltexts) - Auswahl bleibt unangetastet, Bubble zeigt
+"Voice Edit fehlgeschlagen", kein Verlaufseintrag (der Nutzer haette sonst
+einen Eintrag mit leerem `text` gesehen).
+
+**Bekannter Trade-off, nicht geloest:** ist irgendwo aus Versehen noch alter
+Text markiert (der Nutzer wollte eigentlich nur woanders normal diktieren),
+wird das jetzt IMMER als Umschreib-Anweisung interpretiert statt die Auswahl
+wie bisher schlicht mit dem woertlichen Diktat zu ueberschreiben. Genau das
+Verhalten, das Wispr Flows echtes Edit-Feature auch hat - kein Versuch einer
+Heuristik ("klingt das wie eine Anweisung oder wie Text?"), das waere
+Spekulation ohne echte Fehlerberichte, die sie rechtfertigen.
