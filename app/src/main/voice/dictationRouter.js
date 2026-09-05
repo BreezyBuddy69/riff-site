@@ -351,6 +351,7 @@ async function finish() {
     ? text
     : (await transcriptCleanup.clean(cfg, text, appContext.cleanupExtras(styles, category, dictionary, text))).text;
   license.recordWords(cfg, cleanedText);
+  console.log(`[voice] Diktat fertig: "${cleanedText}"`);
 
   // Voice Edit (D40): ist im selben Feld/derselben App gerade etwas markiert,
   // gilt das eben Diktierte als Anweisung dafuer statt als einzufuegender
@@ -359,29 +360,37 @@ async function finish() {
   // Hotkey-Modifier sind also frei) - waehrend einer laufenden Hold-Session
   // waere das Risiko eines verstuemmelten Kombos zu hoch (siehe
   // selectionGrab.js).
-  const selection = await grabSelection({ timeoutMs: 300 });
   let pastedText;
   let editFailed = false;
-  if (selection.text) {
-    const res = await llm.chat(cfg, {
-      system: VOICE_EDIT_SYSTEM_PROMPT,
-      user: `Anweisung: ${cleanedText}\n\nText:\n${selection.text}`,
-      temperature: 0.4,
-      maxTokens: 2048,
-      timeoutMs: 20000,
-    });
-    if (res.ok) {
-      await typingEngine.typeText(res.text);
-      pastedText = res.text;
+  try {
+    const selection = await grabSelection({ timeoutMs: 300 });
+    console.log(`[voice] Voice-Edit-Check: ${selection.text ? `Auswahl gefunden (${selection.text.length} Zeichen)` : 'keine Auswahl'}`);
+    if (selection.text) {
+      const res = await llm.chat(cfg, {
+        system: VOICE_EDIT_SYSTEM_PROMPT,
+        user: `Anweisung: ${cleanedText}\n\nText:\n${selection.text}`,
+        temperature: 0.4,
+        maxTokens: 2048,
+        timeoutMs: 20000,
+      });
+      console.log(`[voice] Voice Edit LLM-Call: ${res.ok ? `ok, ${res.text.length} Zeichen zurueck` : `fehlgeschlagen (${res.error})`}`);
+      if (res.ok) {
+        await typingEngine.typeText(res.text);
+        pastedText = res.text;
+      } else {
+        pastedText = ''; // Auswahl bleibt unangetastet, nichts Falsches ueberschreiben
+        editFailed = true;
+      }
+      setTimeout(() => {
+        try { if (selection.prev) clipboard.writeText(selection.prev); } catch { /* Zwischenablage gesperrt */ }
+      }, 700);
     } else {
-      console.warn('[voice] Voice Edit fehlgeschlagen:', res.error);
-      pastedText = ''; // Auswahl bleibt unangetastet, nichts Falsches ueberschreiben
-      editFailed = true;
+      pastedText = await paste(cleanedText);
     }
-    setTimeout(() => {
-      try { if (selection.prev) clipboard.writeText(selection.prev); } catch { /* Zwischenablage gesperrt */ }
-    }, 700);
-  } else {
+  } catch (err) {
+    // Darf finish() nie unbeobachtet abbrechen lassen (haengender Callback,
+    // Bubble bleibt auf 'thinking' stehen) - lieber roh pasten als nichts tun.
+    console.warn('[voice] Voice-Edit-Check fehlgeschlagen, pastete Rohtext:', err.message);
     pastedText = await paste(cleanedText);
   }
 
