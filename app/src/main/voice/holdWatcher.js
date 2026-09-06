@@ -56,6 +56,18 @@ let holding = false; // Session laeuft (onHoldStart wurde gefeuert)
 let latched = false; // unten, aber keine Session - erst Loslassen abwarten
 let lastAccel = '';
 let helperKeys = '';
+// Coalescing gegen den Helper-Stau (Bug-Report 2026-09: Shortcut reagiert
+// "gar nicht", bis er Minuten spaeter wieder da ist): der Helper bedient seine
+// Anfragen seriell - haengt irgendwo eine Operation, stauen sich alle
+// key_state-Anfragen dahinter auf, und jeder Tastendruck wird verpasst, bis
+// der Stau abgearbeitet ist. Deshalb nie MEHR ALS EIN key_state in der Luft:
+// laeuft noch einer, wird dieser Poll uebersprungen (schedule unten holt ihn
+// gleich nach). Bei einem gesunden Helper antwortet key_state in <10ms, die
+// 20ms-Pollen bleiben also unveraendert schnell - nur im Stau waechst die
+// Warteschlange nicht mehr grenzenlos (max. 1 Anfrage). PLUS der
+// Neustart-Watchdog in helper.js, der einen blockierten Prozess nach wenigen
+// Timeouts beendet und frisch spawnet.
+let keyStateInFlight = false;
 // Waehrend der Hotkey-Aufnahme in den Settings (D37) pausiert der Watcher -
 // sonst wuerde das Druecken von "Strg+Alt" im Recorder sofort ein Diktat
 // starten, statt als neue Kombination gespeichert zu werden.
@@ -75,10 +87,12 @@ function keysFor() {
 }
 
 async function poll() {
+  if (keyStateInFlight) return; // Vorheriger Poll laeuft noch - keinen zweiten key_state-Helper-Call aufschichten (Stau-Schutz, siehe oben)
   if (suspended || !cfg || !cfg.voice.enabled) { reset(); schedule(POLL_IDLE_MS); return; }
   const keys = keysFor();
   if (!keys) { reset(); schedule(POLL_IDLE_MS); return; }
 
+  keyStateInFlight = true;
   let down = false;
   let raw = false;
   try {
@@ -86,10 +100,15 @@ async function poll() {
     down = !!r.down;
     raw = !!r.raw;
   } catch {
-    // Helper kurz beschaeftigt/startet noch - naechster Poll versucht's wieder.
+    // Helper kurz beschaeftigt/startet noch/blockiert - naechster Poll
+    // versucht's wieder. Key-Zustand unveraendert lassen: ein etwaiges
+    // downSince/holding steht fuer sich und wird beim naechsten Erfolg
+    // fortgefuehrt.
+    keyStateInFlight = false;
     schedule(holding ? POLL_ACTIVE_MS : POLL_IDLE_MS);
     return;
   }
+  keyStateInFlight = false;
 
   if (down) {
     if (!downSince) {

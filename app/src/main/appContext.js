@@ -77,12 +77,11 @@ function relevantTerms(terms, rawText) {
 }
 
 // Ob eine Aeusserung ueberhaupt zu einem Woerterbuch-Begriff passen koennte -
-// dieselbe Praefix-Heuristik wie relevantTerms, aber IMMER aktiv (auch bei
-// kleinen Woerterbuechern, die relevantTerms ungefiltert durchreicht). Steuert
-// in dictationRouter.js, ob sich der zweite Cleanup-Roundtrip fuer eine sonst
-// uebersprungene kurze Aeusserung trotzdem lohnt - ohne diesen Check korrigiert
-// das Woerterbuch faktisch nie etwas, weil normale Diktate fast immer unter
-// der SKIP_CLEANUP_MAX_WORDS-Schwelle bleiben.
+// dieselbe Praefix-Heuristik wie relevantTerms. Wird derzeit von keinem
+// Laufzeitpfad mehr gesteuert (kurze Aeusserungen ueberspringen die Cleanup-
+// Runde seit 2026-09-06 IMMER, das Woerterbuch reist stattdessen als
+// Vokabular-Hint an die Transkription) - bleibt als util exportiert, falls
+// ein lokaler Woerterbuch-Match im Paste-Pfad das irgendwann wieder braucht.
 function matchesDictionary(dictionary, rawText) {
   const raw = (rawText || '').toLowerCase();
   return (dictionary || []).some((d) => {

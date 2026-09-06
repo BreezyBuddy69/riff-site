@@ -17,11 +17,26 @@ const HELPER_PATH = path.join(__dirname, '..', '..', 'helper', 'RiffHelper.ps1')
 // false, __dirname-relative Pfade sind in Dev UND gepackt identisch).
 const HELPER_PATH_MAC = path.join(__dirname, '..', '..', 'helper', 'RiffHelperMac');
 const REQUEST_TIMEOUT_MS = 15000;
+// Wie viele Requests in Folge duerfen die per-Anfrage-Frist reissen, bevor der
+// Helper-Prozess als BLOCKIERT gilt und neu gestartet wird? Der Helper bedient
+// Anfragen seriell (ein JSON-Lines-Loop in RiffHelper.ps1) - haengt EINE
+// Operation (z.B. SendKeys gegen eine widerspenstige App, ein zaehes
+// Get-Process), stauen sich alle weiteren Anfragen dahinter auf. Die
+// Tastatur-Watcher pollen key_state alle 20ms; ohne Watchdog findet kein
+// Tastendruck mehr statt, bis die blockierende Operation von selbst endet
+// (real beobachtet: Shortcut "tot" fuer Minuten, dann ist er ploetzlich
+// wieder da). Neustart = frischer Prozess mit leerem stdin - die gestaute
+// Warteschlange stirbt mit dem Prozess, der naechste Poll ist sofort wieder
+// scharf. 3 sollte klein genug fuer schnelle Selbstheilung (~4.5s bei 1.5s
+// Timeout), gross genug, um einen normalen, nur kurz stockenden Helper nicht
+// zu killen.
+const KILL_AFTER_STREAK = 3;
 
 let child = null;
 let readyPromise = null;
 let nextId = 1;
 const pending = new Map(); // id -> {resolve, reject, timer}
+let timeoutStreak = 0;     // aufeinanderfolgende Timeouts ohne Erfolg -> Helpers oben
 
 function cleanup(reason) {
   for (const [, entry] of pending) {
@@ -31,6 +46,19 @@ function cleanup(reason) {
   pending.clear();
   child = null;
   readyPromise = null;
+}
+
+// Setzt den Laufzeit-Zustand zurueck (zwingt den naechsten Aufruf zu einem
+// frischen Spawn) und killt den laufenden Prozess, falls noch einer existiert.
+// Das 'exit'-Event des sterbenden Prozesses laeuft danach nochmal durch
+// cleanup() - der thisChild-Guard im Handler (siehe ensureStarted) verhindert,
+// dass ein verspaeteter Exit einen bereits neu gestarteten Prozess zerstoert.
+function restartHelper(reason) {
+  const dying = child;
+  if (dying) {
+    cleanup(reason);
+    try { dying.kill(); } catch { /* schon tot */ }
+  }
 }
 
 function ensureStarted() {
@@ -47,6 +75,7 @@ function ensureStarted() {
       : spawn('powershell.exe', [
         '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', HELPER_PATH,
       ], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+    const thisChild = child;
 
     const startTimer = setTimeout(() => {
       reject(new Error('Action-Helper nicht rechtzeitig bereit'));
@@ -90,6 +119,11 @@ function ensureStarted() {
 
     child.stderr.on('data', (d) => console.error('[helper]', String(d).trim()));
     child.on('exit', (code) => {
+      // Der Prozess, der hier endet, ist nicht mehr der aktuelle (restartHelper
+      // hat einen Nachfolger gestartet) - der alte Exit darf den frischen
+      // Helper nicht zerstoeren (cleanup() wuerde sonst dessen pending
+      // fälschlich verwerfen und child/readyPromise nullen).
+      if (child !== thisChild) return;
       console.warn(`[helper] Prozess beendet (Code ${code})`);
       cleanup(`Action-Helper beendet (Code ${code})`);
     });
@@ -109,15 +143,26 @@ async function request(op, params = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       pending.delete(id);
+      timeoutStreak++;
+      if (timeoutStreak >= KILL_AFTER_STREAK) {
+        const reason = `${timeoutStreak} Helper-Requests hintereinander ohne Antwort - Prozess haengt, Neustart.`;
+        timeoutStreak = 0;
+        restartHelper(reason);
+      }
       const err = new Error(`Aktion "${op}" hat nicht rechtzeitig geantwortet`);
       err.code = 'HELPER_TIMEOUT';
       reject(err);
     }, timeoutMs);
-    pending.set(id, { resolve, reject, timer });
+    pending.set(id, {
+      resolve: (result) => { timeoutStreak = 0; resolve(result); },
+      reject: (err) => { timeoutStreak = 0; reject(err); },
+      timer,
+    });
     child.stdin.write(payload, (err) => {
       if (err) {
         pending.delete(id);
         clearTimeout(timer);
+        timeoutStreak = 0;
         reject(err);
       }
     });

@@ -1,20 +1,19 @@
-// Online-Route fuer Speech-to-Text: OpenRouter /audio/transcriptions (Whisper-kompatibel),
-// entweder direkt mit dem eigenen Key ODER - falls keiner in config.json hinterlegt ist -
-// ueber Riffs n8n-Fallback-Webhook (n8n haelt dort einen eigenen OpenRouter-Key, siehe
-// DECISIONS.md D5). JSON+Base64 statt multipart, weil nur das JSON-Format laut OpenRouter-
-// Doku zuverlaessig den `provider`-Parameter unterstuetzt: `order: ['groq']` erzwingt Groqs
-// Whisper-Inferenz (~200x Realtime statt eines langsameren Default-Anbieters) - der groesste
-// Hebel gegen die 3-5s Diktier-Latenz. Kein hartes Pinning (kein allow_fallbacks:false) -
-// ist Groq fuer ein Modell nicht verfuegbar, routet OpenRouter automatisch anders.
+// Online-Route fuer Speech-to-Text: OpenRouter /audio/transcriptions,
+// entweder direkt mit dem eigenen Key ODER - falls keiner in config.json
+// hinterlegt ist - ueber Riffs n8n-Fallback-Webhook (n8n haelt dort einen
+// eigenen OpenRouter-Key, siehe DECISIONS.md D5). JSON+Base64 statt multipart,
+// weil OpenRouter das fuer beide Modellfamilien akzeptiert.
+//
+// WICHTIG (OpenRouter-Doku 2026): die Transcription-Route unterstuetzt KEIN
+// per-Request-Provider-Routing - ein `provider: { order: [...] }`-Block wird
+// komplett ignoriert. Ein Groq-Pin lief hier also nie; fuer Whisper-Modelle
+// waehlt OpenRouter den Anbieter selbst und der Default ist nicht
+// garantiert der schnellste. Qualitaet+Schnelligkeit steuert ALLEIN die
+// Modellwahl: Default ist inzwischen openai/gpt-4o-mini-transcribe (OpenAI
+// direkt, ~0.7s Latenz, bessere Deutsche Erkennung als Whisper).
 const { encodeWav } = require('./wav');
 
 const N8N_STT_URL = 'https://n8n.halovisionai.cloud/webhook/riff-stt';
-
-// Whisper liegt auf OpenRouter bei mehreren Anbietern - Pin auf Groq erzwingt
-// dessen ~200x-Realtime-Inferenz statt eines langsameren Defaults. Andere
-// waehlbare Modelle (z.B. Parakeet) haben auf OpenRouter nur einen Anbieter,
-// ein Pin waere dort wirkungslos bzw. koennte den einzigen Treffer ausschliessen.
-const GROQ_PINNED_MODELS = new Set(['openai/whisper-large-v3-turbo', 'openai/whisper-large-v3']);
 
 async function transcribeDirect(cfg, base64Wav, opts) {
   const res = await fetch('https://openrouter.ai/api/v1/audio/transcriptions', {
@@ -28,7 +27,6 @@ async function transcribeDirect(cfg, base64Wav, opts) {
       input_audio: { data: base64Wav, format: 'wav' },
       ...(cfg.voice.language && cfg.voice.language !== 'auto' ? { language: cfg.voice.language } : {}),
       ...(opts.prompt ? { prompt: opts.prompt } : {}),
-      ...(GROQ_PINNED_MODELS.has(cfg.voice.speechModel) ? { provider: { order: ['groq'] } } : {}),
     }),
     signal: AbortSignal.timeout(opts.partial ? 8000 : 15000),
   });

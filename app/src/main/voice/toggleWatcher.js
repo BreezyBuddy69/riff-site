@@ -28,6 +28,12 @@ let downSince = 0;  // 0 = Kombination ist oben
 let suspended = false;
 let lastAccel = '';
 let helperKeys = '';
+// Coalescing gegen Helper-Stau, identisch zu holdWatcher.js (siehe dort):
+// nie mehr als EIN key_state in der Luft, sonst waechst die Warteschlange
+// im seriellen Helper bei einer blockierenden Operation grenzenlos und der
+// Toggle-Shortcut reagiert nicht mehr. Zusaetzlich raeumt der Neustart-
+// Watchdog in helper.js einen blockierten Prozess nach wenigen Timeouts ab.
+let keyStateInFlight = false;
 
 function keysFor() {
   const accel = (cfg.hotkeys.flowToggle || '').trim();
@@ -39,18 +45,22 @@ function keysFor() {
 }
 
 async function poll() {
+  if (keyStateInFlight) return; // Vorheriger Poll laeuft noch - kein zweiter key_state-Call im Stau aufschichten
   if (suspended || !cfg || !cfg.voice.enabled) { reset(); schedule(POLL_IDLE_MS); return; }
   const keys = keysFor();
   if (!keys) { reset(); schedule(POLL_IDLE_MS); return; }
 
+  keyStateInFlight = true;
   let down = false;
   try {
     const r = await helper.request('key_state', { keys }, 1500);
     down = !!r.down;
   } catch {
+    keyStateInFlight = false;
     schedule(POLL_ACTIVE_MS);
     return;
   }
+  keyStateInFlight = false;
 
   const now = Date.now();
   if (down && !downSince) {

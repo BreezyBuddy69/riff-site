@@ -40,11 +40,18 @@ const DEFAULTS = {
     language: 'auto',
     noiseSuppression: true,
     audioDeviceId: '', // '' = System-Standardmikrofon
-    // Turbo statt Full (Nutzer-Feedback: Kosten-Dashboard zeigte Whisper als
-    // groessten Kostentreiber): auf Groq $0,04/h statt $0,111/h - fast 3x
-    // guenstiger, WER-Verlust ist fuer diktierte Alltagssaetze kaum spuerbar
-    // und wird von der Cleanup-Runde ohnehin nachgeglaettet.
-    speechModel: 'openai/whisper-large-v3-turbo',
+// GPT-4o mini Transcribe statt Whisper (Nutzerwunsch 2026-09-06: "eines,
+    // das ein bisschen teurer ist, aber ein Stueckchen besser ist") - OpenAI
+    // eigener STT-Nachfolger: bessere Worterkennung, bessere Spracherkennung
+    // (v.a. Deutsch) und sauberere Formatierung/Punktuation als Whisper, dazu
+    // direkt bei OpenAI gehostet mit ~0.7s Latenz statt Whisper-Routing ueber
+    // beliebige OpenRouter-Anbieter. Audio-Transkription kostet fast nichts
+    // (kurzes Diktat ~wenige Hundertstel Cent), ein paar Cent mehr als der
+    // Whisper-Turbo fallen absolut nicht ins Gewicht. OpenRouters
+    // Transcription-Route ignoriert den provider-Block (siehe
+    // speechRecognition.js) - die Modellwahl IST der einzige Hebel auf
+    // Qualitaet+Schnelligkeit, ein Anbieter-Pin waere wirkungslos.
+    speechModel: 'openai/gpt-4o-mini-transcribe',
     cleanupModel: 'deepseek/deepseek-v4-flash',
     // Direkter OpenRouter-Call aus dem Main-Prozess fuer minimale Latenz
     // (Sable2 D14). Lokal in config.json, nie an den Renderer gereicht.
@@ -135,12 +142,17 @@ function normalize(parsed) {
     ...parsed.voice,
     sounds: { ...DEFAULTS.voice.sounds, ...(parsed.voice && parsed.voice.sounds) },
   };
-  // Einmalige Migration (Nutzer-Feedback: Kosten-Dashboard): der alte Default
-  // 'openai/whisper-large-v3' steht in bereits installierten config.json-
-  // Dateien fest, ohne dass es je ein UI-Feld dafuer gab - jeder gespeicherte
-  // alte Wert ist also garantiert der frühere Default, nie eine bewusste
-  // Nutzerwahl, daher ohne Rueckfrage auf die guenstigere Turbo-Variante heben.
-  if (voice.speechModel === 'openai/whisper-large-v3') voice.speechModel = DEFAULTS.voice.speechModel;
+  // Einmalige Migrationen fuer BEREITS installierte config.json-Dateien: die
+  // jeweiligen Werte standen dort nie hinter einer bewussten Nutzerwahl (es
+  // gab lange kein UI-Feld fuer das Modell), sie sind garantiert alter
+  // Default - daher ohne Rueckfrage auf den neuen Default heben.
+  // - 2026-08: 'openai/whisper-large-v3' (alter Default) -> Turbo (guenstiger)
+  // - 2026-09: 'openai/whisper-large-v3-turbo' (letzter Default) -> GPT-4o
+  //   mini Transcribe (besser, minimal teurer - Nutzerwunsch)
+  if (voice.speechModel === 'openai/whisper-large-v3'
+    || voice.speechModel === 'openai/whisper-large-v3-turbo') {
+    voice.speechModel = DEFAULTS.voice.speechModel;
+  }
   return {
     hotkeys: { ...DEFAULTS.hotkeys, ...parsed.hotkeys },
     voice,

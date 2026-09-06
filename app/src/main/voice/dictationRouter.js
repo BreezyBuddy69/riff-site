@@ -340,13 +340,14 @@ async function finish() {
   const styles = store.styles;
   // autoCleanup aus: Rohtranskript wird gepastet (Nutzer will exakt das
   // Gesprochene, ohne Modell dazwischen) - spart auch den zweiten Roundtrip.
-  // Sonst: kurze Aeusserungen ueberspringen den Roundtrip NUR, wenn kein
-  // Woerterbuch-Begriff moeglicherweise betroffen ist - sonst wuerde das
-  // Woerterbuch (siehe appContext.cleanupExtras) bei normalen, meist kurzen
-  // Diktaten faktisch nie greifen (Nutzer-Feedback: Korrektur "funktioniert
-  // nicht beim Aufnehmen").
-  const skipCleanup = styles.autoCleanup === false
-    || (wordCount <= SKIP_CLEANUP_MAX_WORDS && !appContext.matchesDictionary(dictionary, text));
+  // Sonst laeuft die Cleanup-Runde GENAU dann, wenn sie sich lohnt: ab der
+  // SKIP_CLEANUP_MAX_WORDS-Schwelle (~1min Diktat). Kurze Aeusserungen
+  // ueberspringen sie IMMER - das Woerterbuch hangelt sich ohnehin als
+  // Vokabular-Hinweis direkt an die Transkription (vocabularyPrompt in
+  // speechRecognition.js, der billigste Ort) und braucht keinen zweiten
+  // Roundtrip dafuer (Nutzerwunsch 2026-09-06: "keine extra KI, die checkt,
+  // was aufgenommen wurde" - ein 3-Woerter-Diktat muss instant da sein).
+  const skipCleanup = styles.autoCleanup === false || wordCount <= SKIP_CLEANUP_MAX_WORDS;
   const cleanedText = skipCleanup
     ? text
     : (await transcriptCleanup.clean(cfg, text, appContext.cleanupExtras(styles, category, dictionary, text))).text;
