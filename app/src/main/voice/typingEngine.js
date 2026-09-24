@@ -22,11 +22,32 @@ function rememberSegment(length) {
   if (segments.length > MAX_SEGMENTS) segments.shift();
 }
 
+// Kompletter Zwischenablage-Schnappschuss statt nur Text: wer formatierten
+// Text (HTML/RTF, z.B. aus Word/Browser) oder ein Bild kopiert hat und dann
+// diktiert, soll danach genau das wieder in der Zwischenablage haben.
+// ponytail: Text/HTML/RTF/Bild - kopierte DATEIEN (Explorer) ueberleben einen
+// Paste nicht. Ergaenzen per readBuffer('FileNameW'), falls das jemand meldet.
+function snapshotClipboard() {
+  const snap = { text: clipboard.readText(), html: clipboard.readHTML(), rtf: clipboard.readRTF() };
+  const image = clipboard.readImage();
+  if (!image.isEmpty()) snap.image = image;
+  return snap;
+}
+
+function restoreClipboard(snap) {
+  if (!snap) return;
+  try {
+    // Nur befuellte Formate schreiben - ein leeres HTML-Format wuerde manche
+    // Apps beim naechsten Einfuegen "nichts" einfuegen lassen.
+    const data = {};
+    for (const k of ['text', 'html', 'rtf', 'image']) if (snap[k]) data[k] = snap[k];
+    if (Object.keys(data).length) clipboard.write(data);
+    else clipboard.clear();
+  } catch { /* Clipboard gerade von anderer App gesperrt - Restore verwerfen */ }
+}
+
 async function typeText(text) {
-  // Vorherigen Clipboard-Inhalt sichern (Text UND Bild - readText liefert
-  // bei reinem Bild-Inhalt nur '', das Bild waere sonst beim Restore weg).
-  const prevText = clipboard.readText();
-  const prevImage = prevText ? null : clipboard.readImage();
+  const prev = snapshotClipboard();
 
   clipboard.writeText(text);
   try {
@@ -34,8 +55,7 @@ async function typeText(text) {
   } catch (err) {
     // Paste nicht moeglich (Helper beschaeftigt o.ae.) - Fallback auf das
     // alte Zeichen-fuer-Zeichen-Tippen: langsamer, aber gleiche Wirkung.
-    if (prevText) clipboard.writeText(prevText);
-    else if (prevImage && !prevImage.isEmpty()) clipboard.writeImage(prevImage);
+    restoreClipboard(prev);
     try {
       await helper.request('type', { text });
       rememberSegment(text.length);
@@ -49,12 +69,8 @@ async function typeText(text) {
   // Restore verzoegert und nur, wenn der Clipboard-Inhalt noch unserer ist -
   // hat der Nutzer inzwischen selbst etwas kopiert, gewinnt der Nutzer.
   setTimeout(() => {
-    try {
-      if (clipboard.readText() !== text) return;
-      if (prevText) clipboard.writeText(prevText);
-      else if (prevImage && !prevImage.isEmpty()) clipboard.writeImage(prevImage);
-      else clipboard.clear();
-    } catch { /* Clipboard gerade von anderer App gesperrt - Restore verwerfen */ }
+    try { if (clipboard.readText() !== text) return; } catch { return; }
+    restoreClipboard(prev);
   }, CLIPBOARD_RESTORE_MS);
 }
 
@@ -77,4 +93,4 @@ async function deleteLastSegment() {
   return true;
 }
 
-module.exports = { typeText, pressKeys, deleteLastSegment };
+module.exports = { typeText, pressKeys, deleteLastSegment, snapshotClipboard, restoreClipboard };

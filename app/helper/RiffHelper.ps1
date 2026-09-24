@@ -93,6 +93,85 @@ public static class SableNative {
 }
 '@
 
+# Mikrofon-Stumm-Erkennung (Nutzerwunsch 2026-09-24: "wenn man nicht gehoert
+# wird, soll Riff erkennen, dass das Mikro aus ist, und sagen: drueck F8").
+# Laptop-Mute-Tasten (HP F8, Lenovo F4, ...) schalten meist den Windows-
+# Endpoint stumm - Core Audio (IAudioEndpointVolume) liest und loest das. Die
+# Methoden sind void statt HRESULT: COM-Interop wandelt Fehler in Exceptions,
+# die Aufrufer unten fangen sie (kein Mikro = kein Endpoint = Exception).
+# Vtable-Reihenfolge ist Pflicht, deshalb auch die ungenutzten Methoden.
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+[ComImport, Guid("5CDF2C82-841E-4546-9722-0CF74078229A"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IRiffEndpointVolume {
+  void RegisterControlChangeNotify(IntPtr p);
+  void UnregisterControlChangeNotify(IntPtr p);
+  void GetChannelCount(out uint c);
+  void SetMasterVolumeLevel(float db, ref Guid ctx);
+  void SetMasterVolumeLevelScalar(float level, ref Guid ctx);
+  void GetMasterVolumeLevel(out float db);
+  void GetMasterVolumeLevelScalar(out float level);
+  void SetChannelVolumeLevel(uint ch, float db, ref Guid ctx);
+  void SetChannelVolumeLevelScalar(uint ch, float level, ref Guid ctx);
+  void GetChannelVolumeLevel(uint ch, out float db);
+  void GetChannelVolumeLevelScalar(uint ch, out float level);
+  void SetMute([MarshalAs(UnmanagedType.Bool)] bool mute, ref Guid ctx);
+  void GetMute([MarshalAs(UnmanagedType.Bool)] out bool mute);
+}
+[ComImport, Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IRiffMMDevice {
+  void Activate(ref Guid iid, int clsCtx, IntPtr p, [MarshalAs(UnmanagedType.IUnknown)] out object o);
+}
+[ComImport, Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IRiffMMDeviceEnumerator {
+  void EnumAudioEndpoints(int flow, int mask, out IntPtr devices);
+  void GetDefaultAudioEndpoint(int flow, int role, out IRiffMMDevice dev);
+}
+[ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")] public class RiffMMDeviceEnumerator {}
+public static class RiffMic {
+  // flow 1 = eCapture; role 0 = eConsole (Chromiums "default"), 2 = eCommunications
+  public static IRiffEndpointVolume Endpoint(int role) {
+    try {
+      var e = (IRiffMMDeviceEnumerator)new RiffMMDeviceEnumerator();
+      IRiffMMDevice d; e.GetDefaultAudioEndpoint(1, role, out d);
+      Guid iid = typeof(IRiffEndpointVolume).GUID; object o;
+      d.Activate(ref iid, 23, IntPtr.Zero, out o);
+      return (IRiffEndpointVolume)o;
+    } catch { return null; }
+  }
+  // PowerShell kann Interface-Methoden auf einem __ComObject nicht direkt
+  // aufrufen - darum liest C# selbst: { existiert, stumm, Pegel 0..1 }.
+  public static float[] State() {
+    var v = Endpoint(0);
+    if (v == null) return new float[] { 0, 0, 0 };
+    bool m; float l; v.GetMute(out m); v.GetMasterVolumeLevelScalar(out l);
+    return new float[] { 1, m ? 1 : 0, l };
+  }
+  public static void SetMute(bool mute) {
+    Guid g = Guid.Empty;
+    foreach (int role in new[] { 0, 2 }) {
+      var v = Endpoint(role); if (v == null) continue;
+      v.SetMute(mute, ref g);
+      // Pegel auf 0 % wirkt wie stumm - "einschalten" hebt ihn dann mit an.
+      float l; v.GetMasterVolumeLevelScalar(out l);
+      if (!mute && l < 0.05f) v.SetMasterVolumeLevelScalar(0.8f, ref g);
+    }
+  }
+}
+'@
+
+# Windows-Datenschutz kann Desktop-Apps das Mikro verweigern - Chromium
+# bekommt dann trotzdem einen Stream, nur voller Nullen. Von aussen sieht das
+# aus wie ein stummes Mikro, braucht aber einen anderen Hinweis.
+function Test-MicPrivacyBlocked {
+  $base = 'Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone'
+  foreach ($key in @("HKLM:\$base", "HKCU:\$base", "HKCU:\$base\NonPackaged")) {
+    try { if ((Get-ItemProperty -Path $key -Name Value -ErrorAction Stop).Value -eq 'Deny') { return $true } } catch {}
+  }
+  return $false
+}
+
 # Per-Monitor-V2-DPI-Awareness (Win10 1703+), Fallback auf System-DPI-aware -
 # danach sind alle Cursor-Koordinaten physische Pixel, auf jedem Monitor.
 try {
@@ -200,14 +279,45 @@ function Test-KeysDown([string]$combo, [bool]$exclusive = $true) {
   # Der Scan laeuft nur, wenn die Kombination selbst schon unten ist, also
   # selten und kurz - im Leerlauf kostet er nichts.
   if (-not $exclusive) { return $true }
+  $now = [Environment]::TickCount
   foreach ($other in $CONFLICT_VK) {
     if ($wanted -contains $other) { continue }
-    if (([SableNative]::GetAsyncKeyState($other) -band 0x8000) -ne 0) { return $false }
+    if (([SableNative]::GetAsyncKeyState($other) -band 0x8000) -ne 0) {
+      # Schon vor dem Hotkey dauerhaft "unten" = haengende Taste, kein
+      # fremder Shortcut (siehe Update-IdleDown).
+      if ($script:idleDown.ContainsKey($other) -and ($now - $script:idleDown[$other]) -gt $STUCK_AFTER_MS) { continue }
+      return $false
+    }
   }
   return $true
   # ponytail: gilt nur fuer Kombinationen. Ein Hotkey aus einer einzelnen Taste
   # laeuft in key_state ueber den Einzeltasten-Pfad und bleibt nicht-exklusiv -
   # den braucht die Shift-Abfrage in transforms.js genau so.
+}
+
+# Haengende Tasten (D41, live gemessen 2026-09-24): Windows meldete bei
+# Jayden Pfeil links/rechts dauerhaft als gedrueckt - ein Programm hatte sie
+# per Injektion gedrueckt und nie losgelassen. Der Exklusiv-Scan oben hielt
+# das fuer "dritte Taste dazu" und verwarf JEDEN Hotkey-Druck: Shortcut tot,
+# ohne jede Meldung. Deshalb wird im Leerlauf (Hotkey NICHT unten) alle
+# ~500ms gemerkt, welche Konflikt-Tasten schon unten sind und seit wann - wer
+# laenger als STUCK_AFTER_MS vor dem Hotkey unten war, zaehlt nicht als
+# fremder Shortcut. Ein echter Strg+Alt+X-Druck (X kommt NACH Strg+Alt) wird
+# weiterhin erkannt.
+$script:idleDown = @{}
+$script:lastIdleScan = 0
+$STUCK_AFTER_MS = 1500
+function Update-IdleDown {
+  $now = [Environment]::TickCount
+  if (($now - $script:lastIdleScan) -lt 500) { return }
+  $script:lastIdleScan = $now
+  foreach ($vk in $CONFLICT_VK) {
+    if (([SableNative]::GetAsyncKeyState($vk) -band 0x8000) -ne 0) {
+      if (-not $script:idleDown.ContainsKey($vk)) { $script:idleDown[$vk] = $now }
+    } elseif ($script:idleDown.ContainsKey($vk)) {
+      $script:idleDown.Remove($vk)
+    }
+  }
 }
 
 function Escape-SendKeys([string]$text) {
@@ -539,6 +649,7 @@ function Handle-Request($req) {
       # raw = Kombination physisch unten (ohne Exklusiv-Scan), down = zusaetzlich
       # keine Fremdtaste dabei. Der teure Scan laeuft nur, wenn raw schon wahr ist.
       $raw = Test-KeysDown $k $false
+      if (-not $raw) { Update-IdleDown }
       return @{ down = ($raw -and (Test-KeysDown $k $true)); raw = $raw }
     }
     'mods_state' {
@@ -555,6 +666,16 @@ function Handle-Request($req) {
         altLeft   = (([SableNative]::GetAsyncKeyState(0xA4) -band 0x8000) -ne 0)
         altRight  = (([SableNative]::GetAsyncKeyState(0xA5) -band 0x8000) -ne 0)
       }
+    }
+    'mic_state' {
+      $s = [RiffMic]::State()
+      return @{ exists = ($s[0] -eq 1); muted = ($s[1] -eq 1); volume = [math]::Round($s[2], 2); privacyBlocked = (Test-MicPrivacyBlocked) }
+    }
+    'mic_mute' {
+      # mute=false (Default) ist der App-Fall "Klick auf den Hinweis schaltet
+      # das Mikro ein"; mute=true gibt es nur fuer den Selbsttest.
+      [RiffMic]::SetMute([bool]$req.mute)
+      return @{ muted = [bool]$req.mute }
     }
     'speak' {
       if ($req.voice) { try { $script:synth.SelectVoice($req.voice) } catch {} }

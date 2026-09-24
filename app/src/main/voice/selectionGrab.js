@@ -6,6 +6,8 @@
 // Auswahl-Umschreiben, D40).
 const { clipboard } = require('electron');
 const helper = require('../helper');
+const { snapshotClipboard, restoreClipboard } = require('./typingEngine');
+const { copyBehavior, looksLikeLineCopy } = require('../appContext');
 
 const COPY_POLL_MS = 60;
 const COPY_POLL_TRIES = 12; // max ~720ms
@@ -43,23 +45,36 @@ async function waitForModifiersUp() {
 // schnell, der haeufigere Fall (keine Auswahl) traegt den vollen Timeout.
 // timeoutMs ist absichtlich ein Parameter: transforms.js ruft explizit einen
 // Hotkey fuer eine Auswahl-Aktion auf (voller Timeout vertretbar), waehrend
-// dictationRouter.js das bei JEDEM Diktat probiert (D40) - dort kuerzer, damit
-// der haeufigere "nichts markiert"-Fall normales Diktieren nicht spuerbar
-// verlangsamt.
-async function grabSelection({ timeoutMs = COPY_POLL_TRIES * COPY_POLL_MS } = {}) {
+// dictationRouter.js das bei JEDEM Diktat probiert (D40) - dort kuerzer und
+// parallel zur Spracherkennung (D41), damit es nie auf der Uhr steht.
+//
+// `prev` ist ein kompletter Zwischenablage-Snapshot (Text/HTML/RTF/Bild).
+// Frueher nur Text - und ohne Auswahl wurde er nie zurueckgeschrieben: die
+// Zwischenablage war nach JEDEM Diktat leer (Bug, 2026-09-24 gefunden). Jetzt
+// stellt grabSelection sie ohne Auswahl sofort selbst wieder her; mit Auswahl
+// macht das der Aufrufer (restoreClipboard(prev)), nachdem er gepastet hat.
+async function grabSelection({ timeoutMs = COPY_POLL_TRIES * COPY_POLL_MS, app = '' } = {}) {
+  const behavior = copyBehavior(app);
+  if (behavior === 'never') return { text: '', prev: null };
   await waitForModifiersUp();
-  const prev = clipboard.readText();
+  const prev = snapshotClipboard();
   // Leeren, damit ein fehlgeschlagenes Ctrl+C nicht den alten Inhalt als
   // "Auswahl" ausgibt und woanders einfuegt.
   clipboard.writeText('');
-  await helper.request('keys', { keys: 'ctrl+c' });
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, COPY_POLL_MS));
-    const text = clipboard.readText();
-    if (text && text.trim()) return { text, prev };
+  let text = '';
+  try {
+    await helper.request('keys', { keys: 'ctrl+c' });
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, COPY_POLL_MS));
+      const t = clipboard.readText();
+      if (t && t.trim()) { text = t; break; }
+    }
+  } finally {
+    if (text && behavior === 'line' && looksLikeLineCopy(text)) text = '';
+    if (!text) restoreClipboard(prev);
   }
-  return { text: '', prev };
+  return { text, prev };
 }
 
 module.exports = { grabSelection };

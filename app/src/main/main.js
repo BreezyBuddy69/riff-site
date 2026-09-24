@@ -4,7 +4,7 @@
 // und seit dem App-Ausbau (APP-MASTER-PROMPT.md) die IPC-Oberflaeche fuer das
 // Hauptfenster: Verlauf, Insights, Woerterbuch, Snippets, Stil, Transforms,
 // Scratchpad, Konto.
-const { app, ipcMain, shell, clipboard } = require('electron');
+const { app, ipcMain, shell, clipboard, systemPreferences } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -24,6 +24,7 @@ const insights = require('./insights');
 const account = require('./account');
 const transforms = require('./transforms');
 const appContext = require('./appContext');
+const speechRecognition = require('./voice/speechRecognition');
 
 // --hidden: stiller Autostart-Start (autostart.js haengt das beim Login-Start
 // an die Verknuepfung an), zeigt kein Fenster. Jeder andere Start (Doppelklick,
@@ -82,11 +83,24 @@ if (!app.requestSingleInstanceLock()) {
     voiceWindow.create();
     dictationRouter.init({ cfgRef: cfg });
 
+    // macOS (D41): ohne aktive Anfrage taucht Riff in Datenschutz &
+    // Sicherheit gar nicht erst auf - Nutzer finden dort nichts zum
+    // Anhaken, Diktat und Einfuegen bleiben stumm. askForMediaAccess zeigt
+    // den Mikrofon-Dialog, isTrustedAccessibilityClient(true) traegt Riff in
+    // die Bedienungshilfen-Liste ein und oeffnet den System-Dialog dazu.
+    if (process.platform === 'darwin') {
+      systemPreferences.askForMediaAccess('microphone').catch(() => {});
+      if (!systemPreferences.isTrustedAccessibilityClient(true)) {
+        console.warn('[riff] Bedienungshilfen-Berechtigung fehlt noch - Einfuegen funktioniert erst danach.');
+      }
+    }
+
     holdWatcher.start({
       cfgRef: cfg,
       onHoldStart: () => dictationRouter.startHold(),
       onHoldEnd: () => dictationRouter.endHold(),
       onHoldAbort: () => dictationRouter.abortHold(),
+      onPrepare: () => dictationRouter.prepareCapture(),
     });
     toggleWatcher.start({
       cfgRef: cfg,
@@ -95,13 +109,9 @@ if (!app.requestSingleInstanceLock()) {
     transformIssues = transforms.init({ cfgRef: cfg });
 
     helper.warmUp();
-    // TCP/TLS/Keep-Alive-Verbindung zum spaeter tatsaechlich genutzten Host
-    // vorwaermen - ohne das zahlt der ALLERERSTE Diktier-Versuch der Session
-    // den vollen Handshake obendrauf zur eigentlichen Transkriptions-Latenz.
-    // Pfad/Antwort sind egal, das Keep-Alive-Pooling greift pro Origin.
-    fetch(cfg.voice.openRouterApiKey ? 'https://openrouter.ai/api/v1/models' : 'https://n8n.halovisionai.cloud/webhook/riff-stt', {
-      signal: AbortSignal.timeout(5000),
-    }).catch(() => {});
+    // Verbindung zum STT-Host vorwaermen (net.fetch haelt sie danach
+    // minutenlang warm, D41) - sonst zahlt das erste Diktat den Handshake.
+    speechRecognition.prewarm(cfg);
 
     // Konto still nachziehen (Tier/Session) - schlaegt das fehl, bleibt alles
     // wie es war. Kein Blocker fuer den Start.
@@ -113,10 +123,16 @@ if (!app.requestSingleInstanceLock()) {
     // spaetere Login-Starts still bleiben (D6). Nur EINMAL versucht - laueft
     // still im Hintergrund, ein Fehlschlag (seltene Rechte-Probleme) blockt
     // den Start nie.
-    if (!cfg.general.onboardingCompleted && !autostart.isEnabled()) {
-      autostart
-        .enable({ exePath: process.execPath, appDir: path.join(__dirname, '..', '..'), hidden: true })
-        .catch((err) => console.warn('[riff] Autostart-Default fehlgeschlagen:', err.message));
+    // try: ein Fehler hier darf nie wieder Fenster+Tray mitreissen (genau
+    // das passierte auf dem Mac, D41).
+    try {
+      if (!cfg.general.onboardingCompleted && !autostart.isEnabled()) {
+        autostart
+          .enable({ exePath: process.execPath, appDir: path.join(__dirname, '..', '..'), hidden: true })
+          .catch((err) => console.warn('[riff] Autostart-Default fehlgeschlagen:', err.message));
+      }
+    } catch (err) {
+      console.warn('[riff] Autostart-Pruefung fehlgeschlagen:', err.message);
     }
 
     if (!startHidden && cfg.general.showWindowOnStartup) {
@@ -246,6 +262,10 @@ if (!app.requestSingleInstanceLock()) {
   // entscheidet anhand des Session-Zustands, nicht der Aufrufer).
   ipcMain.on('voice:toggle-confirm', () => dictationRouter.toggleFlow());
   ipcMain.on('voice:toggle-cancel', () => dictationRouter.cancelToggle());
+  // D41: Renderer hat die letzten Audio-Puffer geliefert / Klick auf einen
+  // Bubble-Hinweis (Mikro einschalten, Wiederholen, Einstellungen).
+  ipcMain.on('voice:capture-stopped', () => dictationRouter.onCaptureStopped());
+  ipcMain.on('voice:action', () => dictationRouter.runAction());
 
   // "Alle Fenster zu" darf die App nicht beenden - sie soll im Tray
   // weiterlaufen (das ist der ganze Sinn eines Hintergrund-Diktier-Tools).

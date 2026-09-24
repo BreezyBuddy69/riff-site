@@ -8,10 +8,12 @@
 // n8n-Fallback ohne eigenen API-Key. Das Diktat-ueber-Auswahl-Umschreiben
 // (D40) sitzt NICHT hier, sondern direkt in dictationRouter.js - dort nutzt
 // es denselben grabSelection() aus selectionGrab.js.
-const { globalShortcut, clipboard } = require('electron');
+const { globalShortcut } = require('electron');
 const llm = require('./llm');
 const store = require('./store');
 const typingEngine = require('./voice/typingEngine');
+const { restoreClipboard } = typingEngine;
+const helper = require('./helper');
 const voiceWindow = require('./voice/window');
 const dictationRouter = require('./voice/dictationRouter');
 const { grabSelection } = require('./voice/selectionGrab');
@@ -54,13 +56,16 @@ async function runOnSelection(transformId) {
   if (!t) return;
   console.log(`[transforms] "${t.name}" ausgeloest`);
   busy = true;
-  let prevClipboard = '';
+  let prev = null;
   try {
     showBubble('thinking');
-    const grabbed = await grabSelection();
-    prevClipboard = grabbed.prev;
+    // App mitgeben: in Terminals schickt grabSelection kein Strg+C (das
+    // wuerde dort das laufende Programm abbrechen, D41).
+    const fg = await helper.request('foreground', {}, 1500).catch(() => ({}));
+    const grabbed = await grabSelection({ app: fg.app });
+    prev = grabbed.prev;
     if (!grabbed.text) {
-      if (prevClipboard) clipboard.writeText(prevClipboard);
+      // grabSelection hat die Zwischenablage ohne Auswahl schon zurueckgesetzt.
       showBubble('error', 'Kein Text markiert — erst markieren, dann Transform drücken.');
       hideBubble(ERROR_HIDE_MS);
       return;
@@ -68,25 +73,23 @@ async function runOnSelection(transformId) {
 
     const res = await runOnText(transformId, grabbed.text);
     if (!res.ok) {
-      if (prevClipboard) clipboard.writeText(prevClipboard);
+      restoreClipboard(prev);
       showBubble('error', `Transform "${t.name}" fehlgeschlagen. Später erneut versuchen.`);
       hideBubble(ERROR_HIDE_MS);
       return;
     }
 
     // typeText sichert/restauriert die Zwischenablage selbst - danach steht
-    // dort wieder unser geleerter Zwischenstand, deshalb hier explizit den
-    // Original-Inhalt des Nutzers zurueckschreiben.
+    // dort wieder die kopierte Auswahl, deshalb hier explizit den Original-
+    // Inhalt des Nutzers zurueckschreiben.
     await typingEngine.typeText(res.text);
-    setTimeout(() => {
-      try { if (prevClipboard) clipboard.writeText(prevClipboard); } catch { /* Clipboard gesperrt */ }
-    }, 700);
+    setTimeout(() => restoreClipboard(prev), 700);
 
     showBubble('idle');
     hideBubble(IDLE_HIDE_MS);
   } catch (err) {
     console.warn('[transforms] fehlgeschlagen:', err.message);
-    try { if (prevClipboard) clipboard.writeText(prevClipboard); } catch {}
+    restoreClipboard(prev);
     showBubble('error', 'Transform fehlgeschlagen.');
     hideBubble(ERROR_HIDE_MS);
   } finally {

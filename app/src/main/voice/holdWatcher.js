@@ -48,6 +48,7 @@ let cfg = null;
 let onHoldStart = null;
 let onHoldEnd = null;
 let onHoldAbort = null;
+let onPrepare = null;
 
 let timer = null;
 let downSince = 0; // 0 = Kombination ist oben
@@ -114,7 +115,10 @@ async function poll() {
     if (!downSince) {
       downSince = Date.now();
       holdThreshold = HOLD_START_MS; // sicherer Default, bis mods_state (falls angefragt) das Gegenteil bestaetigt
-      if (keys === 'ctrl+alt' && !toggleExtendsHold(keys)) checkAltGrFastPath();
+      // Mikro schon jetzt oeffnen (D41) - ausser es sieht nach AltGr aus
+      // (dann tippt jemand @/EUR/{, kein Diktat, Mikro bleibt zu).
+      if (keys === 'ctrl+alt') checkAltGr(!toggleExtendsHold(keys));
+      else if (onPrepare) onPrepare();
     }
     if (!holding && !latched && Date.now() - downSince >= holdThreshold) {
       const started = onHoldStart ? onHoldStart() : false;
@@ -157,12 +161,14 @@ function toggleExtendsHold(keys) {
   return toggle.startsWith(`${keys}+`);
 }
 
-function checkAltGrFastPath() {
+function checkAltGr(allowFastPath) {
   const askedAt = downSince;
   helper.request('mods_state', {}, 500).then((m) => {
     if (downSince !== askedAt) return;
     const looksLikeAltGr = m.ctrlLeft && m.altRight && !m.ctrlRight && !m.altLeft;
-    if (!looksLikeAltGr) holdThreshold = HOLD_START_FAST_MS;
+    if (looksLikeAltGr) return;
+    if (allowFastPath) holdThreshold = HOLD_START_FAST_MS;
+    if (onPrepare) onPrepare();
   }).catch(() => {}); // Fehler/Timeout -> holdThreshold bleibt beim sicheren HOLD_START_MS
 }
 
@@ -178,11 +184,12 @@ function schedule(ms) {
 
 // onHoldStart muss true zurueckgeben, wenn wirklich eine Session gestartet
 // wurde - sonst merkt sich der Watcher "abgelehnt" und wartet aufs Loslassen.
-function start({ cfgRef, onHoldStart: startFn, onHoldEnd: endFn, onHoldAbort: abortFn }) {
+function start({ cfgRef, onHoldStart: startFn, onHoldEnd: endFn, onHoldAbort: abortFn, onPrepare: prepFn }) {
   cfg = cfgRef;
   onHoldStart = startFn;
   onHoldEnd = endFn;
   onHoldAbort = abortFn;
+  onPrepare = prepFn;
   if (!timer) schedule(POLL_IDLE_MS);
 }
 

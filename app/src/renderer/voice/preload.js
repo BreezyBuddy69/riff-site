@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld('voice', {
   // was "bestaetigen"/"verwerfen" konkret bedeutet.
   confirmToggle: () => ipcRenderer.send('voice:toggle-confirm'),
   cancelToggle: () => ipcRenderer.send('voice:toggle-cancel'),
+  // D41: letzte Audio-Puffer sind raus / Klick auf einen Hinweis mit Aktion.
+  captureStopped: () => ipcRenderer.send('voice:capture-stopped'),
+  runAction: () => ipcRenderer.send('voice:action'),
   onCommand: (cb) => ipcRenderer.on('voice:command', (_e, cmd) => cb(cmd)),
   onUiState: (cb) => ipcRenderer.on('voice:ui-state', (_e, state) => cb(state)),
 });

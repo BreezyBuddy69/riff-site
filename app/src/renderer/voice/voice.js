@@ -22,13 +22,24 @@ let mediaStream = null;
 let audioContext = null;
 let sourceNode = null;
 let workletNode = null;
+let flushResolve = null;
+// Jeder Start/Stopp zaehlt hoch: kommt getUserMedia erst zurueck, NACHDEM
+// schon gestoppt wurde (sehr kurzer Tastendruck), wird der verspaetete
+// Stream sofort wieder geschlossen statt das Mikro offen zu lassen.
+let captureGen = 0;
 
 // ---------- UI-State vom Main-Prozess ----------
 function applyUiState(state) {
   if (!state) return;
   pill.setAttribute('data-phase', state.phase || 'idle');
   pill.setAttribute('data-kind', state.kind || 'hold');
-  errorText.textContent = state.phase === 'error' ? (state.errorText || 'Fehler') : '';
+  // D41: tone = error|warn|info (Farbe der Meldung), hint = Hinweis WAEHREND
+  // der Aufnahme (z.B. "Mikrofon ist stumm"), clickable = Klick loest die
+  // Aktion der Meldung aus (Mikro einschalten, Wiederholen, ...).
+  pill.setAttribute('data-tone', state.tone || 'error');
+  pill.toggleAttribute('data-hint', !!state.hint);
+  pill.toggleAttribute('data-clickable', !!state.clickable);
+  errorText.textContent = state.hint || (state.phase === 'error' ? (state.errorText || 'Fehler') : '');
   if (state.phase !== 'listening') resetLevels();
 }
 
@@ -113,28 +124,47 @@ async function listDevices() {
   }
 }
 
+// AudioContext + Worklet-Modul bleiben zwischen Diktaten bestehen (D41) -
+// vorher wurden beide bei JEDEM Tastendruck neu gebaut, bevor das erste
+// Sample ankam. Im Leerlauf ist der Context suspendiert (haelt kein
+// Audiogeraet offen), resume() dauert ein paar Millisekunden.
+async function ensureContext(sampleRate) {
+  if (audioContext && audioContext.state !== 'closed' && audioContext.sampleRate === sampleRate) {
+    if (audioContext.state === 'suspended') await audioContext.resume();
+    return audioContext;
+  }
+  audioContext = new AudioContext({ sampleRate });
+  await audioContext.audioWorklet.addModule('pcm-worklet.js');
+  return audioContext;
+}
+
 async function startCapture(cmd) {
-  await stopCapture(); // idempotent - falls schon etwas laeuft, sauber neu starten
+  await stopCapture({ silent: true }); // idempotent - falls schon etwas laeuft, sauber neu starten
+  const gen = ++captureGen;
 
   try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        deviceId: cmd.deviceId || undefined,
-        noiseSuppression: !!cmd.noiseSuppression,
-        echoCancellation: true,
-        autoGainControl: true,
-      },
-    });
+    // Parallel: Mikrofon oeffnen UND Audio-Pipeline bereitmachen.
+    const [stream, ctx] = await Promise.all([
+      navigator.mediaDevices.getUserMedia({
+        audio: {
+          deviceId: cmd.deviceId || undefined,
+          noiseSuppression: !!cmd.noiseSuppression,
+          echoCancellation: true,
+          autoGainControl: true,
+        },
+      }),
+      ensureContext(cmd.sampleRate || 16000),
+    ]);
+    if (gen !== captureGen) { for (const t of stream.getTracks()) t.stop(); return; }
+    mediaStream = stream;
 
-    audioContext = new AudioContext({ sampleRate: cmd.sampleRate || 16000 });
-    await audioContext.audioWorklet.addModule('pcm-worklet.js');
-
-    sourceNode = audioContext.createMediaStreamSource(mediaStream);
-    workletNode = new AudioWorkletNode(audioContext, 'pcm-processor', { processorOptions: {} });
+    sourceNode = ctx.createMediaStreamSource(mediaStream);
+    workletNode = new AudioWorkletNode(ctx, 'pcm-processor', { processorOptions: {} });
 
     workletNode.port.onmessage = (event) => {
-      const { pcm, level, vadEvent } = event.data;
+      const { pcm, level, vadEvent, flushed } = event.data;
       if (pcm && pcm.byteLength) window.voice.sendPcm(pcm);
+      if (flushed) { if (flushResolve) flushResolve(); return; }
       if (vadEvent) window.voice.sendVad({ state: vadEvent, level });
       pushLevel(level);
     };
@@ -143,13 +173,28 @@ async function startCapture(cmd) {
     // der Nutzer live selbst ueber die Lautsprecher (Feedback/Echo).
     sourceNode.connect(workletNode);
   } catch (err) {
-    await stopCapture();
-    showLocalError('Mikrofon nicht verfügbar');
+    if (gen !== captureGen) return; // laengst gestoppt - kein Fehler zeigen
+    await stopCapture({ silent: true });
+    showLocalError(err && err.name === 'NotFoundError'
+      ? 'Kein Mikrofon gefunden. Hier klicken → Mikrofon wählen.'
+      : 'Mikrofon nicht verfügbar oder Zugriff verweigert. Hier klicken → Einstellungen.');
   }
 }
 
-async function stopCapture() {
+// Den Rest aus dem Worklet holen, bevor die Leitung gekappt wird (D41) - das
+// Worklet schickt nur alle ~32ms, ohne das fehlte oft die letzte Silbe.
+function flushWorklet() {
+  return new Promise((resolve) => {
+    flushResolve = () => { flushResolve = null; resolve(); };
+    try { workletNode.port.postMessage({ type: 'flush' }); } catch { flushResolve(); return; }
+    setTimeout(() => { if (flushResolve) flushResolve(); }, 100);
+  });
+}
+
+async function stopCapture({ silent = false } = {}) {
+  captureGen++;
   try {
+    if (workletNode) await flushWorklet();
     if (mediaStream) {
       for (const track of mediaStream.getTracks()) track.stop();
     }
@@ -158,9 +203,7 @@ async function stopCapture() {
       workletNode.disconnect();
     }
     if (sourceNode) sourceNode.disconnect();
-    if (audioContext && audioContext.state !== 'closed') {
-      await audioContext.close();
-    }
+    if (audioContext && audioContext.state === 'running') await audioContext.suspend();
   } catch {
     // Teardown darf den Renderer nie crashen - wird auch aufgerufen, wenn
     // gerade gar nichts laeuft (Idempotenz ist hier der Sinn des try/catch).
@@ -168,8 +211,8 @@ async function stopCapture() {
     mediaStream = null;
     sourceNode = null;
     workletNode = null;
-    audioContext = null;
     resetLevels();
+    if (!silent) window.voice.captureStopped();
   }
 }
 
@@ -182,8 +225,10 @@ cancelBtn.addEventListener('click', () => window.voice.cancelToggle());
 // Ruhezustand (voice.idleBubbleEnabled): ein Klick auf den kleinen Punkt
 // startet ein Diktat - dieselbe IPC wie der Haken-Klick im Toggle-Modus,
 // dictationRouter.toggleFlow() startet eine neue Session, wenn keine laeuft.
-pill.addEventListener('click', () => {
+pill.addEventListener('click', (e) => {
+  if (e.target.closest('.ctrl')) return; // Haken/Kreuz haben eigene Handler
   if (pill.getAttribute('data-phase') === 'resting') window.voice.confirmToggle();
+  else if (pill.hasAttribute('data-clickable')) window.voice.runAction();
 });
 
 window.voice.onCommand(handleCommand);

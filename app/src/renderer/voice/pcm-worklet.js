@@ -46,6 +46,11 @@ class PcmProcessor extends AudioWorkletProcessor {
 
     this.port.onmessage = (event) => {
       if (event.data && event.data.type === 'echo-guard') this.echoGuard = !!event.data.on;
+      // Stopp: angesammelten Rest sofort rausschicken, dann quittieren (D41).
+      if (event.data && event.data.type === 'flush') {
+        this.flush(null);
+        this.port.postMessage({ flushed: true });
+      }
     };
   }
 

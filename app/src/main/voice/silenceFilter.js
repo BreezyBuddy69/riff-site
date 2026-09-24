@@ -149,7 +149,66 @@ function stripHallucination(text, endedInSilence = false) {
   return out;
 }
 
+// ---------- Stummes Mikrofon (D41, Nutzerwunsch 2026-09-24) ----------
+// Ein stummgeschaltetes Mikro (Mute-Taste, Windows-Stumm, Datenschutz-Sperre)
+// liefert keinen leisen, sondern einen DIGITAL leeren Stream: exakt 0. Ein
+// echtes Mikro hat immer ein Grundrauschen, auch in einem stillen Raum - Werte
+// <= 1 LSB ueber eine volle Sekunde gibt es nur, wenn nichts ankommt.
+const DIGITAL_SILENCE_PEAK = 1;
+const MUTE_DETECT_MS = 1000;
+
+function peakAbs(buf) {
+  let peak = 0;
+  for (let i = 0; i + 1 < buf.length; i += 2) {
+    const v = Math.abs(buf.readInt16LE(i));
+    if (v > peak) { peak = v; if (peak > DIGITAL_SILENCE_PEAK) break; }
+  }
+  return peak;
+}
+
+function isDigitalSilence(buf) {
+  return buf.length > 0 && peakAbs(buf) <= DIGITAL_SILENCE_PEAK;
+}
+
+// Hinweistext + Klick-Aktion fuer die Bubble, aus dem Helper-`mic_state`
+// ({ exists, muted, volume, privacyBlocked } - auf dem Mac gibt es den Op
+// nicht, dann ist `state` leer und der allgemeine Hinweis greift).
+function micHintFor(state = {}, platform = process.platform) {
+  if (state.muted || (state.exists && state.volume === 0)) {
+    return { text: 'Mikrofon ist stumm. Mute-Taste drücken (oft F8) – oder hier klicken.', action: 'unmute' };
+  }
+  if (state.privacyBlocked) {
+    return { text: 'Windows blockiert das Mikrofon. Hier klicken → Datenschutz-Einstellungen.', action: 'privacy' };
+  }
+  if (state.exists === false) {
+    return { text: 'Kein Mikrofon gefunden. Headset oder Mikro anschließen.', action: 'settings' };
+  }
+  return platform === 'darwin'
+    ? { text: 'Kein Ton vom Mikrofon. Hier klicken → Mikrofon wählen / Berechtigung prüfen.', action: 'settings' }
+    : { text: 'Kein Ton vom Mikrofon. Mute-Taste (oft F8) prüfen – oder hier klicken und ein anderes Mikro wählen.', action: 'settings' };
+}
+
+// ---------- Lange Diktate in Stuecken (D41) ----------
+// Ab SEGMENT_MIN_MS ungesendetem Audio wird an der naechsten echten
+// Sprechpause geschnitten und das Stueck schon im Hintergrund transkribiert -
+// am Ende wartet nur noch der Rest. Gemessen: 67s Audio am Stueck 2,4s,
+// 13s-Stueck 0,8s. 0,7s Pause liegt klar ueber der Luecke zwischen Woertern
+// und trifft meist ein Satzende.
+// ponytail: fester Pausen-Schwellwert, keine Satzgrenzen-Erkennung - kommen
+// Saetze an Schnittstellen zerhackt an, SEGMENT_CUT_SILENCE_MS hochsetzen.
+const SEGMENT_MIN_MS = 20000;
+const SEGMENT_CUT_SILENCE_MS = 700;
+
+function shouldCutSegment(pendingMs, silentRunMs) {
+  return pendingMs >= SEGMENT_MIN_MS && silentRunMs >= SEGMENT_CUT_SILENCE_MS;
+}
+
+function joinSegments(texts) {
+  return texts.map((t) => (t || '').trim()).filter(Boolean).join(' ');
+}
+
 module.exports = {
   isSilence, voicedMs, isSpeech, isHallucination, stripHallucination, trimSilence,
-  SILENCE_RMS, MIN_VOICED_MS, HALLUCINATION_SILENCE_MS,
+  peakAbs, isDigitalSilence, micHintFor, shouldCutSegment, joinSegments,
+  SILENCE_RMS, MIN_VOICED_MS, HALLUCINATION_SILENCE_MS, MUTE_DETECT_MS,
 };

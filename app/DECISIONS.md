@@ -526,3 +526,71 @@ wie bisher schlicht mit dem woertlichen Diktat zu ueberschreiben. Genau das
 Verhalten, das Wispr Flows echtes Edit-Feature auch hat - kein Versuch einer
 Heuristik ("klingt das wie eine Anweisung oder wie Text?"), das waere
 Spekulation ohne echte Fehlerberichte, die sie rechtfertigen.
+
+## 2026-09-24 — D41: schneller, merkt ein stummes Mikro, Mac startet wieder
+
+Nutzerwunsch: "in jedem Bereich verbessern", Beispiel "wenn man nicht gehört
+wird, erkennt Riff, dass das Mikro aus ist, und sagt: drück F8", "viel
+schneller", Mac-Download soll wirklich funktionieren. Vorher GEMESSEN statt
+geraten: Helper-key_state < 1ms (kein Flaschenhals), STT direkt 0,8-1,1s /
+n8n-Parakeet 0,5-1,6s fuer 13s Audio, 67s Audio am Stueck 2,4s.
+
+**Geschwindigkeit**
+- Voice-Edit-Auswahlcheck (D40) laeuft PARALLEL zur Erkennung statt danach -
+  vorher ~350ms (Strg+C + 300ms Poll) obendrauf bei JEDEM Diktat.
+- Mikro startet schon beim Druecken der Kombination (`prepareCapture`, nach
+  dem AltGr-Check - wer @ tippt, oeffnet kein Mikro), die Session uebernimmt
+  den laufenden Stream. Gemessen: erstes Audio 29-53ms nach Sessionstart statt
+  206-210ms; vorher gingen ~450ms ab Tastendruck verloren (erstes Wort weg).
+  Kein Session binnen 1,5s -> Mikro wieder zu.
+- AudioContext + Worklet bleiben zwischen Diktaten (suspendiert) bestehen.
+- Worklet-Rest wird beim Stopp geflusht (Renderer quittiert mit
+  `voice:capture-stopped`, max 150ms, gemessen 48ms) - letzte Silbe fehlte.
+- Lange Diktate: ab 20s ungesendetem Audio wird an 0,7s Pause geschnitten
+  und das Stueck schon waehrend des Sprechens erkannt; der vorige Text reist
+  als `prompt` mit. `silenceFilter.shouldCutSegment` (getestet).
+- `net.fetch` statt Node-fetch fuer STT/LLM (gemessen warm ~20ms statt
+  40-50ms, kalt 80 statt 160ms; HTTP/2 bleibt minutenlang warm, System-Proxy
+  wird genutzt) + Vorwaermen beim Tastendruck.
+
+**Robustheit**
+- Stummes Mikro: digital leerer Stream (Peak <= 1 LSB fuer 1s) -> Helper-Op
+  `mic_state` (Core Audio IAudioEndpointVolume + Datenschutz-Registry) ->
+  Bubble "Mikrofon ist stumm. Mute-Taste druecken (oft F8) – oder hier
+  klicken" -> Klick = `mic_mute {mute:false}`. Aufnahme laeuft weiter, Hinweis
+  verschwindet mit dem ersten Ton. Live getestet (stumm geschaltet, Screenshot
+  der Bubble, wieder an). Varianten: Datenschutz-Sperre -> ms-settings,
+  kein Mikro / sonst -> Einstellungen. `micHintFor` getestet.
+- "Nichts gehoert" statt stillem Verschwinden (Session >= 0,7s).
+- Erkennung fehlgeschlagen -> automatisch zweite Route (direkt -> n8n), dann
+  "klicken zum Wiederholen" (Audio bleibt im Speicher), offline erkannt.
+- **Bug: Zwischenablage war nach jedem Diktat leer.** grabSelection leerte sie
+  fuer den Strg+C-Test und stellte sie ohne Auswahl nie wieder her; typeText
+  "sicherte" dann die leere. Jetzt Snapshot Text/HTML/RTF/Bild, live geprueft
+  (CLIPTEST-Wert ueberlebt Hold- und Toggle-Diktat).
+- Strg+C-Schutz: in Terminals nie (bricht dort das laufende Programm ab), in
+  Code-Editoren gilt eine kopierte Einzelzeile (VS Code "emptySelection-
+  Clipboard") nicht als Auswahl. `appContext.copyBehavior` (getestet).
+  Bekannte Luecke: VS Codes integriertes Terminal sieht aus wie der Editor.
+- **Haengende Tasten:** bei Jayden meldete Windows Pfeil links/rechts
+  dauerhaft als gedrueckt (irgendein Programm hatte sie nie losgelassen) -
+  der Exklusiv-Scan verwarf dadurch JEDEN Hotkey, Shortcut tot ohne Meldung.
+  Helper merkt sich im Leerlauf, welche Tasten schon >1,5s unten sind; die
+  zaehlen nicht als fremder Shortcut. Live verifiziert.
+
+**Mac**
+- `autostart.isEnabled()` warf auf macOS (kein %APPDATA%) und riss die ganze
+  Startsequenz mit - kein Fenster, kein Tray. Jetzt `setLoginItemSettings`.
+- Berechtigungen werden aktiv angefragt (Mikrofon, Bedienungshilfen im Main,
+  Eingabeueberwachung/Events-Posten im Swift-Helper) - vorher tauchte Riff in
+  den Datenschutz-Listen gar nicht auf. `NSMicrophoneUsageDescription` in der
+  Info.plist. Swift-`key_state` liefert jetzt `raw` + exklusiv wie Windows.
+- Weiterhin NICHT auf echter Mac-Hardware getestet.
+
+**Windows-Download:** Riff.exe trug die Metadaten "Electron / GitHub, Inc. /
+electron.exe" (`signAndEditExecutable:false`) - eine umbenannte Fremd-Exe ist
+ein klassisches AV-Heuristik-Signal. Jetzt Riff/Riff/0.2.0 + Riff-Icon.
+Stolperstein: electron-builder entpackt winCodeSign mit Symlinks (darwin-
+Dateien), das scheitert ohne Windows-Entwicklermodus - geloest durch einmal
+manuell entpacktes `%LOCALAPPDATA%\electron-builder\Cache\winCodeSign\
+winCodeSign-2.6.0`. SmartScreen-Warnung bleibt ohne Zertifikat.

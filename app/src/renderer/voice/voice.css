@@ -170,3 +170,29 @@ body {
 #pill[data-phase="resting"] #errorText {
   display: none;
 }
+
+/* ---------- Hinweise (D41) ----------
+   tone: error = rot (Erkennung fehlgeschlagen), warn = bernstein (Mikro
+   stumm), info = weiss ("Nichts gehoert", "Mikro wieder an"). Waehrend der
+   Aufnahme (data-hint) bleibt die Waveform sichtbar - sobald nach dem
+   Einschalten wieder Ton kommt, sieht man die Balken sofort ausschlagen. */
+#pill[data-tone="warn"] { --err: #ffcc66; }
+#pill[data-tone="info"] { --err: var(--ink); }
+#pill[data-phase="error"][data-tone="warn"] { border-color: rgba(255, 204, 102, 0.5); }
+#pill[data-phase="error"][data-tone="info"] { border-color: var(--glass-border); }
+
+#pill[data-kind][data-phase][data-hint] {
+  width: 300px;
+  height: 100px;
+  border-radius: 22px;
+  flex-direction: column;
+  gap: 10px;
+  border-color: rgba(255, 204, 102, 0.5);
+  animation: none;
+  --err: #ffcc66;
+}
+#pill[data-hint] #errorText { display: block; }
+#pill[data-kind][data-phase][data-hint] .ctrl { display: none; }
+
+#pill[data-clickable] { cursor: pointer; }
+#pill[data-clickable]:hover { border-color: rgba(255, 255, 255, 0.4); }

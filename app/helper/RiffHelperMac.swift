@@ -122,16 +122,39 @@ func pressCombo(_ combo: String, useActionMapping: Bool) throws {
   for m in modCodes.reversed() { postKey(m, down: false) }
 }
 
-// key_state: fuer Riff zaehlt nur 'down' (siehe holdWatcher.js/toggleWatcher.js
-// - 'pressed'/Flanken-Feld aus der Windows-Fassung wird von Riffs JS-Code
-// nirgends gelesen, deshalb hier nicht nachgebaut).
-func isKeysDown(_ combo: String) -> Bool {
+// key_state: 'down' + 'raw' wie unter Windows (siehe keyStateFor) - das
+// 'pressed'/Flanken-Feld der Windows-Fassung liest Riffs JS-Code nirgends.
+func comboKeycodes(_ combo: String) -> [CGKeyCode]? {
   let parts = combo.lowercased().split(separator: "+").map(String.init).filter { !$0.isEmpty }
+  if parts.isEmpty { return nil }
+  var codes: [CGKeyCode] = []
   for p in parts {
-    guard let code = modifierKeycodeForDetection(p) ?? keycodeFor(p) else { return false }
-    if !CGEventSource.keyState(.combinedSessionState, key: code) { return false }
+    guard let code = modifierKeycodeForDetection(p) ?? keycodeFor(p) else { return nil }
+    codes.append(code)
   }
-  return !parts.isEmpty
+  return codes
+}
+
+// Gleiches Protokoll wie RiffHelper.ps1 (D41): raw = Kombination physisch
+// unten, down = zusaetzlich KEINE weitere Taste dabei. holdWatcher.js braucht
+// beides, um "losgelassen" von "fremder Shortcut mit dritter Taste" zu
+// unterscheiden - vorher kannte der Mac nur down (nicht exklusiv), ein
+// Ctrl+Option+X in einer anderen App lief dort als Diktat durch.
+let CONFLICT_KEYCODES: [CGKeyCode] = Array(Set(KEYCODES.values)) +
+  [VK_CTRL, VK_CTRL_R, VK_ALT, VK_ALT_R, VK_SHIFT, VK_SHIFT_R, VK_CMD, 54 /* Cmd rechts */]
+
+func keyStateFor(_ combo: String) -> [String: Any] {
+  guard let codes = comboKeycodes(combo) else { return ["down": false, "raw": false] }
+  let raw = codes.allSatisfy { CGEventSource.keyState(.combinedSessionState, key: $0) }
+  if !raw || codes.count < 2 { return ["down": raw, "raw": raw] }
+  // Linke UND rechte Seite eines geforderten Modifiers gelten als "gewollt".
+  var wanted = Set(codes)
+  if wanted.contains(VK_CTRL) { wanted.insert(VK_CTRL_R) }
+  if wanted.contains(VK_ALT) { wanted.insert(VK_ALT_R) }
+  if wanted.contains(VK_SHIFT) { wanted.insert(VK_SHIFT_R) }
+  if wanted.contains(VK_CMD) { wanted.insert(54) }
+  let foreign = CONFLICT_KEYCODES.contains { !wanted.contains($0) && CGEventSource.keyState(.combinedSessionState, key: $0) }
+  return ["down": !foreign, "raw": true]
 }
 
 func modsState() -> [String: Any] {
@@ -203,14 +226,20 @@ func handleRequest(_ req: [String: Any]) throws -> [String: Any] {
     try pressCombo(keys, useActionMapping: true)
     return ["pressed": keys]
   case "key_state":
-    let keys = (req["keys"] as? String) ?? ""
-    return ["down": isKeysDown(keys)]
+    return keyStateFor((req["keys"] as? String) ?? "")
   case "mods_state":
     return modsState()
   default:
     throw HelperError(message: "Unbekannte Operation: \(op)")
   }
 }
+
+// Berechtigungen einmal anfragen (D41): ohne Anfrage taucht Riff in
+// "Eingabeueberwachung" (Tastenstatus lesen) bzw. "Bedienungshilfen" (Text
+// einfuegen) gar nicht erst auf. Das System fragt nur, solange noch nicht
+// entschieden wurde - kein Dauer-Popup.
+if !CGPreflightListenEventAccess() { _ = CGRequestListenEventAccess() }
+if !CGPreflightPostEventAccess() { _ = CGRequestPostEventAccess() }
 
 setbuf(stdout, nil) // ungepuffert - jede Zeile muss sofort raus, wie AutoFlush=true auf der PS1-Seite
 

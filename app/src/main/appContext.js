@@ -106,4 +106,41 @@ function cleanupExtras(styles, category, dictionary, rawText) {
   return parts.join('\n');
 }
 
-module.exports = { categorize, cleanupExtras, matchesDictionary, CATEGORY_LABELS, STYLE_LABELS, STYLE_INSTRUCTIONS };
+// Was ein Strg+C in dieser App anrichtet, wenn NICHTS markiert ist (Voice
+// Edit prueft nach jedem Diktat per Strg+C auf eine Auswahl, D40/D41):
+//   'never' - Terminals: Strg+C bricht das laufende Programm ab. Nie senden.
+//   'line'  - Code-Editoren kopieren ohne Auswahl die ganze aktuelle Zeile
+//             (VS Code "emptySelectionClipboard", JetBrains, Sublime) - eine
+//             kopierte Einzelzeile mit Zeilenumbruch ist dort KEINE Auswahl.
+//   'normal'- alles andere.
+// Windows-Prozessnamen und macOS-App-Namen (localizedName) in einer Liste.
+// ponytail: feste Namensliste - fehlt ein Terminal, schickt Riff dort Strg+C.
+// Ergaenzen, sobald eins gemeldet wird. Bekannte Luecke: das INTEGRIERTE
+// Terminal in VS Code sieht von aussen aus wie der Editor ('line').
+const NEVER_COPY_APPS = new Set([
+  'windowsterminal', 'wt', 'cmd', 'powershell', 'pwsh', 'powershell_ise', 'conhost', 'openconsole',
+  'mintty', 'alacritty', 'wezterm-gui', 'wezterm', 'putty', 'kitty', 'hyper', 'tabby', 'warp',
+  'terminal', 'iterm2', 'ghostty',
+]);
+const LINE_COPY_APPS = new Set([
+  'code', 'code - insiders', 'visual studio code', 'cursor', 'windsurf', 'devenv', 'sublime_text', 'sublime text',
+  'idea64', 'pycharm64', 'webstorm64', 'rider64', 'clion64', 'goland64', 'phpstorm64', 'rubymine64',
+  'datagrip64', 'studio64', 'intellij idea', 'pycharm', 'webstorm', 'android studio', 'zed',
+]);
+
+function copyBehavior(appName) {
+  const key = String(appName || '').toLowerCase().replace(/\.exe$/, '');
+  if (NEVER_COPY_APPS.has(key)) return 'never';
+  if (LINE_COPY_APPS.has(key)) return 'line';
+  return 'normal';
+}
+
+// Genau eine Zeile plus Zeilenumbruch = die Zeilen-Kopie eines Editors.
+function looksLikeLineCopy(text) {
+  return /^[^\r\n]*\r?\n$/.test(text || '');
+}
+
+module.exports = {
+  categorize, cleanupExtras, matchesDictionary, copyBehavior, looksLikeLineCopy,
+  CATEGORY_LABELS, STYLE_LABELS, STYLE_INSTRUCTIONS,
+};

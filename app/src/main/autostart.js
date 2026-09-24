@@ -3,6 +3,7 @@
 // loeschen, komplett reversibel. "--autostart" laesst main.js einen stillen
 // Login-Start von einem expliziten Oeffnen unterscheiden.
 const { execFile } = require('child_process');
+const { app } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
@@ -16,7 +17,13 @@ function shortcutPath() {
   );
 }
 
+// macOS (D41): kein %APPDATA%, keine .lnk - Anmeldeobjekte ueber Electron.
+// Vorher warf shortcutPath() dort (path.join(undefined)) und riss die ganze
+// Startsequenz in main.js mit: kein Fenster, kein Tray ("Mac tut nichts").
+const isMac = process.platform === 'darwin';
+
 function isEnabled() {
+  if (isMac) return app.getLoginItemSettings().openAtLogin;
   return fs.existsSync(shortcutPath());
 }
 
@@ -25,6 +32,7 @@ function isEnabled() {
 // Anzeige/Hauptfenster, nur die Diktat-Watcher laufen. --autostart bleibt wie
 // bei Sable2 die generelle "das war ein stiller Login-Start"-Markierung.
 async function enable({ exePath, appDir, hidden = false }) {
+  if (isMac) { app.setLoginItemSettings({ openAtLogin: true, openAsHidden: hidden, args: hidden ? ['--hidden'] : [] }); return; }
   const args = hidden ? '. --autostart --hidden' : '. --autostart';
   return new Promise((resolve, reject) => {
     execFile(
@@ -47,6 +55,7 @@ async function enable({ exePath, appDir, hidden = false }) {
 }
 
 function disable() {
+  if (isMac) { app.setLoginItemSettings({ openAtLogin: false }); return; }
   const target = shortcutPath();
   if (fs.existsSync(target)) fs.unlinkSync(target);
 }

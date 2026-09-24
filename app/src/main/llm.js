@@ -8,10 +8,12 @@
 //   - eigener OpenRouter-Key in config.json -> direkter Call, minimale Latenz
 //   - kein Key -> Riffs n8n-Webhook, der einen hinterlegten Key nutzt
 //     (Wispr-Flow-Prinzip: der Nutzer braucht nie einen eigenen Key)
+const { httpFetch } = require('./voice/speechRecognition'); // net.fetch, siehe dort (D41)
+
 const N8N_CHAT_URL = 'https://n8n.halovisionai.cloud/webhook/sable-chat';
 
 async function viaOpenRouter(cfg, messages, opts) {
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  const res = await httpFetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${cfg.voice.openRouterApiKey}`,
@@ -39,7 +41,7 @@ async function viaOpenRouter(cfg, messages, opts) {
 }
 
 async function viaN8n(messages, opts) {
-  const res = await fetch(N8N_CHAT_URL, {
+  const res = await httpFetch(N8N_CHAT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     signal: AbortSignal.timeout(opts.timeoutMs * 2.5), // n8n ist ein Hop mehr

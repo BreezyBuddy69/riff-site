@@ -7,10 +7,13 @@ const assert = require('node:assert/strict');
 
 const insights = require('../src/main/insights');
 const { resolveDictation, applySnippets } = require('../src/main/voice/dictationEngine');
-const { categorize, cleanupExtras, matchesDictionary } = require('../src/main/appContext');
+const {
+  categorize, cleanupExtras, matchesDictionary, copyBehavior, looksLikeLineCopy,
+} = require('../src/main/appContext');
 const { parseAccelerator, hotkeyLabel, savingsHoursPerWeek } = require('../src/renderer/app/onboardingLogic');
 const {
   isSilence, isSpeech, isHallucination, stripHallucination, trimSilence,
+  isDigitalSilence, micHintFor, shouldCutSegment, joinSegments,
 } = require('../src/main/voice/silenceFilter');
 const { vocabularyPrompt } = require('../src/main/voice/speechRecognition');
 
@@ -284,6 +287,39 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await sleep(120);
   assert.equal(taps, 1, 'langes Halten der Toggle-Kombi zaehlt nicht als Tap');
   toggleWatcher.stop();
+
+  // --- D41: Strg+C-Schutz fuer Voice Edit -------------------------------------
+  // Im Terminal bricht Strg+C das laufende Programm ab - nie senden.
+  assert.equal(copyBehavior('WindowsTerminal'), 'never');
+  assert.equal(copyBehavior('powershell.exe'), 'never');
+  assert.equal(copyBehavior('Terminal'), 'never', 'macOS-Terminal');
+  // VS Code & Co. kopieren ohne Auswahl die ganze Zeile - das ist keine Auswahl.
+  assert.equal(copyBehavior('Code'), 'line');
+  assert.equal(copyBehavior('notepad'), 'normal');
+  assert.equal(copyBehavior(''), 'normal');
+  assert.ok(looksLikeLineCopy('const x = 1;\r\n'), 'Zeilen-Kopie mit CRLF');
+  assert.ok(looksLikeLineCopy('    return a;\n'), 'Zeilen-Kopie mit LF');
+  assert.ok(!looksLikeLineCopy('markiertes Wort'), 'echte Auswahl ohne Umbruch');
+  assert.ok(!looksLikeLineCopy('zeile 1\nzeile 2\n'), 'mehrere Zeilen = echte Auswahl');
+
+  // --- D41: Stummes Mikro ------------------------------------------------------
+  assert.ok(isDigitalSilence(pcm(new Array(512).fill(0))), 'Nullen = stummes Mikro');
+  assert.ok(isDigitalSilence(pcm([0, 1, -1, 0])), '+-1 LSB zaehlt noch als digital leer');
+  assert.ok(!isDigitalSilence(pcm([0, 3, -2, 0])), 'Grundrauschen eines echten Mikros ist NICHT stumm');
+  assert.ok(!isDigitalSilence(Buffer.alloc(0)), 'leerer Puffer ist kein Befund');
+  assert.equal(micHintFor({ exists: true, muted: true, volume: 0.7 }).action, 'unmute');
+  assert.match(micHintFor({ exists: true, muted: true }).text, /F8/, 'Hinweis nennt die Mute-Taste');
+  assert.equal(micHintFor({ exists: true, muted: false, volume: 0 }).action, 'unmute', 'Pegel 0 % wirkt wie stumm');
+  assert.equal(micHintFor({ exists: true, muted: false, volume: 0.7, privacyBlocked: true }).action, 'privacy');
+  assert.equal(micHintFor({ exists: false }).action, 'settings');
+  assert.equal(micHintFor({}, 'darwin').action, 'settings', 'Mac ohne mic_state -> allgemeiner Hinweis');
+  assert.doesNotMatch(micHintFor({}, 'darwin').text, /F8/, 'kein F8-Hinweis auf dem Mac');
+
+  // --- D41: Lange Diktate in Stuecken -----------------------------------------
+  assert.ok(!shouldCutSegment(19000, 2000), 'unter 20s wird nie geschnitten');
+  assert.ok(!shouldCutSegment(25000, 300), 'kurze Wortluecke ist kein Schnitt');
+  assert.ok(shouldCutSegment(25000, 700), 'lange Pause nach 20s+ schneidet');
+  assert.equal(joinSegments(['Erster Satz.', '', ' Zweiter Satz. ']), 'Erster Satz. Zweiter Satz.');
 
   console.log('OK — alle Pruefungen bestanden.');
 })();

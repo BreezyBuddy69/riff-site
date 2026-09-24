@@ -1,8 +1,8 @@
 {
   "name": "riff",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Riff - Spracherkennung, die schneller ist als Tippen. Shortcut halten oder einmal antippen, sprechen, loslassen.",
+  "description": "Riff",
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
@@ -14,7 +14,9 @@
   "build": {
     "appId": "cloud.halovision.riff",
     "productName": "Riff",
-    "directories": { "output": "dist" },
+    "directories": {
+      "output": "dist"
+    },
     "asar": false,
     "publish": null,
     "files": [
@@ -25,15 +27,28 @@
       "package.json"
     ],
     "win": {
-      "target": ["nsis", "portable"],
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "icon": "assets/icon.ico",
-      "signAndEditExecutable": false
+      "signAndEditExecutable": true
     },
     "mac": {
-      "target": [{ "target": "zip", "arch": ["universal"] }],
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
       "icon": "assets/icon.png",
       "identity": null,
-      "x64ArchFiles": "Contents/Resources/app/helper/RiffHelperMac"
+      "x64ArchFiles": "Contents/Resources/app/helper/RiffHelperMac",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Riff hört nur zu, während du den Diktier-Shortcut hältst, und wandelt deine Sprache in Text um."
+      }
     },
     "afterSign": "scripts/afterSign-mac.js",
     "nsis": {
@@ -47,10 +62,12 @@
     },
     "portable": {
       "artifactName": "Riff-Portable.exe"
-    }
+    },
+    "copyright": "Copyright © 2026 Riff"
   },
   "devDependencies": {
     "electron": "^33.0.0",
     "electron-builder": "^25.1.8"
-  }
+  },
+  "author": "Riff"
 }

@@ -36,6 +36,12 @@ services:
       - traefik.http.middlewares.riff-strip.stripprefix.prefixes=/riff
       - traefik.http.routers.riff.middlewares=riff-redirect,riff-strip
       - traefik.http.services.riff.loadbalancer.server.port=8080
+      - traefik.http.routers.riffjm.rule=Host(`riff.jaydenmikus.com`)
+      - traefik.http.routers.riffjm.entrypoints=websecure
+      - traefik.http.routers.riffjm.tls=true
+      - traefik.http.routers.riffjm.tls.certresolver=letsencrypt
+      - traefik.http.routers.riffjm.service=riff
+      - traefik.http.routers.riffjm.middlewares=riff-strip
 
 networks:
   traefik-proxy:

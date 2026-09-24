@@ -15,7 +15,7 @@ function createTray({ onQuit, onOpenConfig, onOpenSettings, getAutostartEnabled,
       { label: 'Riff öffnen…', click: onOpenSettings },
       { type: 'separator' },
       {
-        label: 'Mit Windows starten',
+        label: process.platform === 'darwin' ? 'Beim Anmelden starten' : 'Mit Windows starten',
         type: 'checkbox',
         checked: getAutostartEnabled(),
         // await noetig: onToggleAutostart() ist async (PowerShell-Skript fuer
