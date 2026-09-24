@@ -479,7 +479,7 @@ async function finish() {
       const h = hint || micHintFor({});
       showNotice(h.text, { tone: 'warn', action: h.action, ms: RETRY_HIDE_MS });
     } else if (durationMs >= NOTHING_HEARD_MIN_MS) {
-      showNotice('Nichts gehört – etwas lauter oder näher ans Mikro sprechen.', { tone: 'info', ms: 2500 });
+      showNotice('Nichts gehört. Sprich etwas lauter oder näher am Mikro.', { tone: 'info', ms: 2500 });
     } else {
       toIdle();
     }
@@ -499,8 +499,8 @@ async function finish() {
     console.warn(`[voice] Spracherkennung fehlgeschlagen: ${failed.error}`);
     lastFailed = { audio: buf, mode, durationMs, app };
     showNotice(failed.offline
-      ? 'Keine Internetverbindung. Klicken zum Wiederholen, sobald du wieder online bist.'
-      : 'Spracherkennung fehlgeschlagen. Klicken zum Wiederholen.', { action: 'retry', ms: RETRY_HIDE_MS });
+      ? 'Keine Internetverbindung. Klick zum Wiederholen, sobald du wieder online bist.'
+      : 'Spracherkennung fehlgeschlagen. Klick zum Wiederholen.', { action: 'retry', ms: RETRY_HIDE_MS });
     return;
   }
 
@@ -533,7 +533,7 @@ async function retryLast() {
   const res = await transcribeSegment(job.audio);
   if (!res.ok) {
     lastFailed = job;
-    showNotice(res.offline ? 'Immer noch offline. Klicken zum Wiederholen.' : 'Wieder fehlgeschlagen. Klicken zum Wiederholen.', { action: 'retry', ms: RETRY_HIDE_MS });
+    showNotice(res.offline ? 'Immer noch offline. Klick zum Wiederholen.' : 'Wieder fehlgeschlagen. Klick zum Wiederholen.', { action: 'retry', ms: RETRY_HIDE_MS });
     return;
   }
   const text = stripHallucination(res.text, res.trailingSilenceMs >= HALLUCINATION_SILENCE_MS);
@@ -549,7 +549,7 @@ function runAction() {
   if (action === 'retry') { retryLast(); return; }
   if (action === 'unmute') {
     helper.request('mic_mute', { mute: false }, 3000).then(
-      () => { if (phase === 'error') showNotice('Mikrofon ist wieder an – jetzt diktieren.', { tone: 'info', ms: 2500 }); },
+      () => { if (phase === 'error') showNotice('Mikrofon ist wieder an. Du kannst diktieren.', { tone: 'info', ms: 2500 }); },
       (err) => console.warn('[voice] Stummschaltung aufheben fehlgeschlagen:', err.message),
     );
     return;
@@ -664,7 +664,7 @@ function onLocalError(text) {
   kind = null;
   capturing = false;
   resetCaptureState();
-  showNotice(String(text || 'Mikrofon nicht verfügbar. Hier klicken → Mikrofon wählen.'), { action: 'settings' });
+  showNotice(String(text || 'Mikrofon nicht verfügbar. Klick hier, um eins zu wählen.'), { action: 'settings' });
 }
 
 function init({ cfgRef }) {

@@ -176,8 +176,8 @@ async function startCapture(cmd) {
     if (gen !== captureGen) return; // laengst gestoppt - kein Fehler zeigen
     await stopCapture({ silent: true });
     showLocalError(err && err.name === 'NotFoundError'
-      ? 'Kein Mikrofon gefunden. Hier klicken → Mikrofon wählen.'
-      : 'Mikrofon nicht verfügbar oder Zugriff verweigert. Hier klicken → Einstellungen.');
+      ? 'Kein Mikrofon gefunden. Klick hier, um eins zu wählen.'
+      : 'Kein Zugriff aufs Mikrofon. Klick hier für die Einstellungen.');
   }
 }
 

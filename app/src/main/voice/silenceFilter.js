@@ -175,17 +175,17 @@ function isDigitalSilence(buf) {
 // nicht, dann ist `state` leer und der allgemeine Hinweis greift).
 function micHintFor(state = {}, platform = process.platform) {
   if (state.muted || (state.exists && state.volume === 0)) {
-    return { text: 'Mikrofon ist stumm. Mute-Taste drücken (oft F8) – oder hier klicken.', action: 'unmute' };
+    return { text: 'Mikrofon ist stumm. Drück die Mute-Taste (oft F8) oder klick hier.', action: 'unmute' };
   }
   if (state.privacyBlocked) {
-    return { text: 'Windows blockiert das Mikrofon. Hier klicken → Datenschutz-Einstellungen.', action: 'privacy' };
+    return { text: 'Windows blockiert das Mikrofon. Klick hier für die Datenschutz-Einstellungen.', action: 'privacy' };
   }
   if (state.exists === false) {
-    return { text: 'Kein Mikrofon gefunden. Headset oder Mikro anschließen.', action: 'settings' };
+    return { text: 'Kein Mikrofon gefunden. Schließ ein Headset oder Mikro an.', action: 'settings' };
   }
   return platform === 'darwin'
-    ? { text: 'Kein Ton vom Mikrofon. Hier klicken → Mikrofon wählen / Berechtigung prüfen.', action: 'settings' }
-    : { text: 'Kein Ton vom Mikrofon. Mute-Taste (oft F8) prüfen – oder hier klicken und ein anderes Mikro wählen.', action: 'settings' };
+    ? { text: 'Kein Ton vom Mikrofon. Klick hier, um Mikro und Berechtigung zu prüfen.', action: 'settings' }
+    : { text: 'Kein Ton vom Mikrofon. Prüf die Mute-Taste (oft F8) oder klick hier für ein anderes Mikro.', action: 'settings' };
 }
 
 // ---------- Lange Diktate in Stuecken (D41) ----------
