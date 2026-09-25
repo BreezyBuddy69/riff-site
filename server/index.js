@@ -17,7 +17,7 @@ const { timingSafeEqual } = require("node:crypto");
 
 const { stmts, redeemCode, importCode, getCounts, logAudit, getMetaCount, bumpMetaCount } = require("./db");
 const { PRODUCTS, getProduct, publicProducts } = require("./products");
-const { checkRedeemAttempt, failureDelay } = require("./ratelimit");
+const { checkRedeemAttempt, checkTranscribe, failureDelay } = require("./ratelimit");
 const sheets = require("./sheets");
 const SEED_CODES = require("./seed-codes");
 
@@ -28,6 +28,12 @@ const HOST = process.env.HOST || "0.0.0.0";
 const TRUST_PROXY = process.env.TRUST_PROXY === "true";
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "";
 const N8N_REDEEM_WEBHOOK_URL = process.env.N8N_REDEEM_WEBHOOK_URL || "";
+// Handy-Web-App (D41): derselbe n8n-STT-Webhook, den auch die Desktop-App ohne
+// eigenen Key nutzt - der Browser spricht nur mit diesem Server (kein CORS,
+// Webhook-URL bleibt intern, Rate-Limit greift hier).
+const STT_WEBHOOK_URL = process.env.RIFF_STT_WEBHOOK_URL || "https://n8n.halovisionai.cloud/webhook/riff-stt";
+// 90 s Sprache als 16-kHz-WAV = ~2,9 MB, als Base64 ~3,9 MB.
+const STT_MAX_BODY = 4 * 1024 * 1024;
 const startedAt = Date.now();
 
 // --- n8n-Redeem-Pfad -----------------------------------------------------------
@@ -101,6 +107,7 @@ const MIME = {
   ".json": "application/json; charset=utf-8",
   ".txt": "text/plain; charset=utf-8",
   ".webmanifest": "application/manifest+json; charset=utf-8",
+  ".sh": "text/plain; charset=utf-8",
 };
 
 const staticCache = new Map(); // urlPath -> { body, gzip, type, immutable }
@@ -180,7 +187,7 @@ function securityHeaders(res) {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("X-Frame-Options", "DENY");
-  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(self), geolocation=()");
   if (TRUST_PROXY) {
     res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   }
@@ -315,6 +322,54 @@ async function handleRedeem(req, res) {
   });
 }
 
+// Handy-Web-App: WAV (Base64) -> n8n-STT -> Text. Keine Speicherung, kein Log
+// des Inhalts - nur Laenge und Ergebnis-Status landen im Audit.
+async function handleTranscribe(req, res) {
+  const ip = clientIp(req);
+  const gate = checkTranscribe(ip);
+  if (!gate.allowed) {
+    return sendJson(req, res, 429, {
+      ok: false,
+      reason: gate.daily ? "daily_limit" : "rate_limited",
+      retryAfterSeconds: gate.retryAfterSeconds,
+    }, { "Retry-After": String(gate.retryAfterSeconds) });
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(req, STT_MAX_BODY);
+  } catch (err) {
+    return sendJson(req, res, err.message === "payload_too_large" ? 413 : 400, {
+      ok: false,
+      reason: err.message === "payload_too_large" ? "too_long" : "invalid_request",
+    });
+  }
+  const audio = typeof body.audioBase64 === "string" ? body.audioBase64 : "";
+  // "UklGR" = Base64 von "RIFF", dem WAV-Dateikopf.
+  if (!audio.startsWith("UklGR") || audio.length < 2000) {
+    return sendJson(req, res, 400, { ok: false, reason: "invalid_audio" });
+  }
+  const language = /^[a-z]{2}$/.test(String(body.language || "")) ? body.language : "auto";
+
+  try {
+    const r = await fetch(STT_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ audioBase64: audio, language }),
+      signal: AbortSignal.timeout(25000),
+    });
+    const data = await r.json().catch(() => null);
+    if (!r.ok || !data || !data.ok) {
+      logAudit("stt_error", { ip, detail: `HTTP ${r.status} ${data && data.error ? String(data.error).slice(0, 120) : ""}` });
+      return sendJson(req, res, 502, { ok: false, reason: "stt_failed" });
+    }
+    return sendJson(req, res, 200, { ok: true, text: String(data.text || "").trim() });
+  } catch (err) {
+    logAudit("stt_error", { ip, detail: err.message });
+    return sendJson(req, res, 502, { ok: false, reason: "stt_failed" });
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   securityHeaders(res);
   const url = new URL(req.url, "http://localhost");
@@ -350,6 +405,10 @@ const server = http.createServer(async (req, res) => {
 
     if (p === "/api/redeem" && req.method === "POST") {
       return await handleRedeem(req, res);
+    }
+
+    if (p === "/api/transcribe" && req.method === "POST") {
+      return await handleTranscribe(req, res);
     }
 
     if (p === "/api/admin/audit" && req.method === "GET") {

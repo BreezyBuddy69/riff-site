@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Riff am Handy</title>
+<meta name="description" content="Sprechen statt tippen, direkt im Browser: Riff schreibt mit, was du sagst, und kopiert den Text für jede App." />
+<meta name="theme-color" content="#0a0a0c" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+<link rel="apple-touch-icon" href="assets/icon-180.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Riff" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body class="m-body" data-state="idle">
+
+<header class="m-top">
+  <a class="nav-logo" href="./" aria-label="Riff Startseite">
+    <span class="nav-orb" aria-hidden="true"></span>
+    <span class="nav-name">Riff</span>
+  </a>
+  <span class="m-badge">Handy</span>
+</header>
+
+<main class="m-main">
+  <!-- Ein Knopf: tippen startet, nochmal tippen beendet. Halten waere am
+       Handy fehleranfaellig (Scrollen, Anrufe, Bildschirmsperre). -->
+  <button id="mic" class="m-mic" type="button" aria-pressed="false" aria-label="Aufnahme starten">
+    <span id="meter" class="m-meter" aria-hidden="true"></span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="9" y="2" width="6" height="12" rx="3" />
+      <path d="M5 10a7 7 0 0 0 14 0" />
+      <line x1="12" y1="17" x2="12" y2="22" />
+    </svg>
+  </button>
+  <p id="status" class="m-status" role="status" aria-live="polite">Tippen und sprechen.</p>
+
+  <label class="m-label" for="out">Dein Text</label>
+  <textarea id="out" class="m-out glass" rows="7" placeholder="Hier erscheint, was du sagst."></textarea>
+
+  <div class="m-actions">
+    <button id="copy" class="btn btn-glass btn-primary" type="button">Kopieren</button>
+    <button id="share" class="btn btn-ghost" type="button" hidden>Teilen</button>
+    <button id="clear" class="btn btn-ghost" type="button">Leeren</button>
+  </div>
+
+  <details class="m-install glass">
+    <summary>Als App auf den Home-Bildschirm</summary>
+    <p><strong>iPhone:</strong> in Safari unten auf Teilen tippen, dann „Zum Home-Bildschirm“.</p>
+    <p><strong>Android:</strong> in Chrome oben rechts auf ⋮ tippen, dann „App installieren“ oder „Zum Startbildschirm hinzufügen“.</p>
+  </details>
+
+  <p class="m-fine">
+    Deine Aufnahme geht nur zur Spracherkennung an Riffs Server. Der fertige Text
+    bleibt auf diesem Gerät gespeichert, bis du ihn leerst.
+    Am Computer diktierst du mit der <a href="./#einloesen">Riff-App</a> direkt in jedes Programm.
+  </p>
+</main>
+
+<script src="mobile.js" defer></script>
+</body>
+</html>

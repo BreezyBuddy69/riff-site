@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Riff — Sprich. Es steht schon da.</title>
-<meta name="description" content="Riff verwandelt Sprache in sauberen, korrekt formatierten Text — schneller als du tippen könntest. Shortcut halten oder doppelt antippen, sprechen, loslassen. Limitierter Erstzugang: 100 Plätze. Code einlösen und sofort starten." />
+<meta name="description" content="Riff verwandelt Sprache in sauberen, korrekt formatierten Text — schneller als du tippen könntest. Shortcut halten oder einmal antippen, sprechen, loslassen. Limitierter Erstzugang: 100 Plätze. Code einlösen und sofort starten." />
 <meta property="og:title" content="Riff — Sprich. Es steht schon da." />
 <meta property="og:description" content="Spracherkennung, die schneller ist als Tippen — mit besserer Rechtschreibung obendrauf. Limitiert auf 100 Erstzugänge — löse deinen Code ein." />
 <meta property="og:type" content="website" />
@@ -27,6 +27,7 @@
       <a href="#produkt">Produkt</a>
       <a href="#funktionen">Funktionen</a>
       <a href="#ablauf">Ablauf</a>
+      <a href="mobile.html">Handy</a>
       <a href="#faq">FAQ</a>
     </nav>
     <a class="btn btn-glass btn-nav" href="#einloesen">Code einlösen</a>
@@ -116,7 +117,7 @@
       <div class="features">
         <article class="feature glass reveal">
           <h3>Zwei Modi, ein Diktat</h3>
-          <p>Modus A: Shortcut halten, sprechen, loslassen. Modus B: zweimal antippen zum Start, zweimal antippen oder Haken/Kreuz-Klick zum Beenden. Beide frei belegbar.</p>
+          <p>Modus A: Shortcut halten, sprechen, loslassen. Modus B: einmal antippen zum Start, nochmal antippen, Enter oder Haken zum Beenden. Beide frei belegbar.</p>
         </article>
         <article class="feature glass reveal">
           <h3>Ein Paste, kein Getippe</h3>
@@ -135,8 +136,8 @@
           <p>Die Bubble ist click-through und folgt deiner Taskbar, egal wo sie sitzt. Sie stiehlt nie den Fokus — deine Zielanwendung bleibt aktiv.</p>
         </article>
         <article class="feature glass reveal">
-          <h3>Dein API-Key, dein Tempo</h3>
-          <p>Spracherkennung und Bereinigung laufen über bewusst günstige, schnelle Modelle. Kein Vendor-Lock-in — der Key bleibt lokal auf deinem PC.</p>
+          <h3>Merkt, wenn du nicht gehört wirst</h3>
+          <p>Mikro stumm geschaltet, falsches Gerät, Windows sperrt den Zugriff: Riff sagt es dir sofort in der Bubble. Ein Klick schaltet ein stummes Mikro wieder ein.</p>
         </article>
       </div>
     </div>
@@ -177,7 +178,7 @@
         <li class="step glass reveal">
           <span class="step-num" aria-hidden="true">3</span>
           <h3>Strg + Alt halten</h3>
-          <p>Riff starten, API-Key eintragen, Hotkey drücken, sprechen. Kein Konto, keine Anmeldung, kein Warten.</p>
+          <p>Halten, sprechen, loslassen. Kein Konto, kein API-Key, keine Einrichtung.</p>
         </li>
       </ol>
     </div>
@@ -246,7 +247,7 @@
 
       <details class="faq-item glass reveal">
         <summary>Was brauche ich, um Riff zu nutzen?</summary>
-        <p>Windows 10/11 oder macOS (Beta) und ein Mikrofon — das eingebaute Notebook-Mikro reicht. Die Windows-Version ist ausgereift, die Mac-Version ist frisch und noch nicht auf echter Hardware getestet. Spracherkennung und Bereinigung laufen ohne eigenen Key über Riffs Server — optional kannst du in den Einstellungen einen eigenen OpenRouter-Key für minimale Latenz eintragen.</p>
+        <p>Windows 10/11 oder macOS (Beta, Intel und Apple Silicon) und ein Mikrofon. Das eingebaute Notebook-Mikro reicht. Die Spracherkennung läuft über Riffs Server, du brauchst keinen eigenen Key. Wer mag, trägt in den Einstellungen einen eigenen OpenRouter-Key ein.</p>
       </details>
       <details class="faq-item glass reveal">
         <summary>Was passiert nach der Code-Einlösung?</summary>
@@ -254,11 +255,23 @@
       </details>
       <details class="faq-item glass reveal">
         <summary>Kostet die Nutzung selbst noch etwas?</summary>
-        <p>Dein Zugangscode schaltet den Download frei. Kostenlos nutzbar bis 1500 Wörter pro Woche — für die meisten reicht das locker. Willst du unbegrenzt diktieren, löst du einen separaten Pro-Code direkt in Riffs Einstellungen ein (nicht hier auf der Website). Spracherkennung und Bereinigung laufen zusätzlich über deinen eigenen API-Key — die Kosten pro Diktat sind gering (Cent-Bereich), du siehst und kontrollierst sie direkt bei deinem Modell-Anbieter.</p>
+        <p>Dein Zugangscode schaltet den Download frei. Kostenlos nutzbar bis 1500 Wörter pro Woche — für die meisten reicht das locker. Willst du unbegrenzt diktieren, löst du einen separaten Pro-Code direkt in Riffs Einstellungen ein (nicht hier auf der Website). Weitere Kosten gibt es nicht: die Spracherkennung läuft über Riffs Server.</p>
       </details>
       <details class="faq-item glass reveal">
         <summary>Was ist der Unterschied zwischen Zugangscode und Pro-Code?</summary>
         <p>Zwei getrennte Codes für zwei Dinge: Der Zugangscode (den du hier unten einlöst) schaltet den Download frei — einer von 100 Plätzen. Der Pro-Code (Format <code>RIFFPRO-XXXX-XXXX-XXXX</code>) hebt das Wochenlimit in der App auf und wird ausschließlich dort eingelöst, in den Einstellungen unter „Konto". Ohne Pro-Code läuft Riff im kostenlosen Modus mit 1500 Wörtern/Woche weiter.</p>
+      </details>
+      <details class="faq-item glass reveal">
+        <summary>Windows warnt beim Installieren. Ist das ein Virus?</summary>
+        <p>Nein. Windows zeigt „Der Computer wurde durch Windows geschützt“ bei jeder App, die (noch) kein kostenpflichtiges Signatur-Zertifikat hat. Klick auf „Weitere Informationen“ und dann „Trotzdem ausführen“. Riff installiert sich nur für deinen Benutzer, ohne Adminrechte, und lässt sich jederzeit über die Windows-Einstellungen entfernen.</p>
+      </details>
+      <details class="faq-item glass reveal">
+        <summary>Mac meldet „beschädigt“ oder öffnet Riff nicht.</summary>
+        <p>macOS sperrt heruntergeladene Apps ohne Apple-Zertifikat. Am einfachsten installierst du Riff mit dem Terminal-Befehl, der nach dem Einlösen angezeigt wird: er lädt Riff ohne diese Sperre. Beim ersten Start fragt macOS nach Mikrofon, Bedienungshilfen und Eingabeüberwachung. Alle drei erlauben, dann Riff einmal neu starten.</p>
+      </details>
+      <details class="faq-item glass reveal">
+        <summary>Gibt es Riff fürs Handy?</summary>
+        <p>Ja, als Web-App: <a href="mobile.html">Riff am Handy</a> öffnen, tippen, sprechen, der Text wird kopiert und du fügst ihn in WhatsApp, Mail oder jede andere App ein. Über „Zum Home-Bildschirm“ liegt Riff wie eine App auf dem Handy.</p>
       </details>
       <details class="faq-item glass reveal">
         <summary>Mein Code funktioniert nicht — was nun?</summary>
@@ -278,6 +291,7 @@
     </div>
     <nav class="footer-links" aria-label="Footer">
       <a href="#produkt">Produkt</a>
+      <a href="mobile.html">Riff am Handy</a>
       <a href="#einloesen">Code einlösen</a>
       <a href="#faq">FAQ</a>
     </nav>

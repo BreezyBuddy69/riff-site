@@ -47,11 +47,12 @@ const PRODUCTS = {
             process.env.RIFF_DOWNLOAD_URL ||
             "https://github.com/BreezyBuddy69/riff-site/releases/download/v1.0.0/Riff-Setup.exe",
           steps: [
-            "Riff-Setup.exe herunterladen und doppelklicken — installiert sich automatisch, kein Entpacken nötig.",
-            "Windows SmartScreen kann beim ersten Start warnen (unsignierte App) — „Weitere Informationen“ → „Trotzdem ausführen“.",
-            "Riff startet nach der Installation automatisch und legt eine Verknüpfung im Startmenü an.",
-            "Strg + Alt halten und sprechen zum Diktieren — Strg + Alt + D zweimal antippen für den Freihand-Modus.",
-            "Kostenlos: 1500 Wörter/Woche. Für unbegrenztes Diktieren einen Pro-Code in den Riff-Einstellungen einlösen.",
+            "Riff-Setup.exe herunterladen und doppelklicken. Kein Entpacken, keine Adminrechte.",
+            "Zeigt Windows „Der Computer wurde durch Windows geschützt“: auf „Weitere Informationen“ klicken, dann auf „Trotzdem ausführen“. Die Warnung kommt, weil Riff noch kein kostenpflichtiges Signatur-Zertifikat hat. Sie ist kein Virusfund.",
+            "Riff startet danach im Hintergrund und ab jetzt mit Windows.",
+            "Strg + Alt halten, sprechen, loslassen. Für freihändiges Diktieren Strg + Alt + D einmal antippen, zum Beenden nochmal oder Enter.",
+            "Ist dein Mikro stumm geschaltet, sagt dir Riff das direkt in der Bubble. Ein Klick schaltet es wieder ein.",
+            "Kostenlos: 1500 Wörter pro Woche. Für unbegrenztes Diktieren einen Pro-Code in Riffs Einstellungen einlösen.",
           ],
         },
         // Beta (2026-08-03): erste macOS-Fassung, auf echter Hardware noch
@@ -64,12 +65,17 @@ const PRODUCTS = {
           url:
             process.env.RIFF_DOWNLOAD_URL_MAC ||
             "https://github.com/BreezyBuddy69/riff-site/releases/download/v1.0.0/Riff-Mac.zip",
+          // Terminal-Einzeiler (D41): curl setzt keine Download-Sperre
+          // (Quarantaene), deshalb kein "beschaedigt"-Dialog und kein
+          // Rechtsklick-Oeffnen noetig. Die Seite baut daraus mit ihrer
+          // eigenen Adresse den kompletten Befehl + Kopier-Knopf.
+          command: "install-mac.sh",
           steps: [
-            "Beta: erste macOS-Version. Jetzt als Universal-Build (Intel + Apple Silicon) — Feedback ist willkommen, aber erwarte Kinderkrankheiten.",
-            "Riff-Mac.zip entpacken, Riff.app in den Programme-Ordner ziehen.",
-            "Erster Start: Rechtsklick auf Riff.app → Öffnen. Bleibt das Icon ausgegraut mit einem X oder meldet macOS „beschädigt“/„kann nicht geöffnet werden“: Terminal öffnen, `xattr -cr /Applications/Riff.app` ausführen (entfernt die Downloadsperre), dann nochmal per Rechtsklick → Öffnen starten.",
-            "Systemeinstellungen → Datenschutz & Sicherheit → Bedienungshilfen: Riff die Berechtigung erteilen — ohne das funktioniert weder der Shortcut noch das Einfügen des Texts.",
-            "Strg + Alt halten und sprechen zum Diktieren — Strg + Alt + D zweimal antippen für den Freihand-Modus.",
+            "Am einfachsten: Terminal öffnen (Cmd + Leertaste, „Terminal“ tippen), den Befehl oben einfügen und Enter drücken. Er lädt Riff, legt es in „Programme“ und startet es.",
+            "Beim ersten Start fragt macOS nach Mikrofon, Bedienungshilfen und Eingabeüberwachung. Alle drei erlauben und Riff danach einmal neu starten.",
+            "Control + Option halten, sprechen, loslassen. Für freihändiges Diktieren Control + Option + D einmal antippen.",
+            "Lieber per Download? Riff-Mac.zip laden, Riff.app in „Programme“ ziehen, mit Rechtsklick → Öffnen starten. Meldet macOS „beschädigt“, im Terminal xattr -cr /Applications/Riff.app ausführen.",
+            "Beta: läuft auf Intel und Apple Silicon. Rückmeldungen helfen uns sehr.",
           ],
         },
       },

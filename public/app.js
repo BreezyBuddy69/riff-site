@@ -260,6 +260,34 @@ function showSuccess(data) {
     const existingLink = deliveryBox.querySelector("a.btn-primary");
     if (existingLink) existingLink.replaceWith(a);
     else deliveryBox.appendChild(a);
+
+    // Mac: Terminal-Befehl mit der Adresse DIESER Seite (laeuft unter
+    // riff.jaydenmikus.com und halovisionai.cloud/riff/ gleichermassen).
+    deliveryBox.querySelector(".cmd")?.remove();
+    if (p.command) {
+      const cmdText = `curl -fsSL ${new URL(p.command, location.href).href} | bash`;
+      const box = document.createElement("div");
+      box.className = "cmd";
+      const code = document.createElement("code");
+      code.textContent = cmdText;
+      const copy = document.createElement("button");
+      copy.type = "button";
+      copy.className = "btn btn-small btn-ghost";
+      copy.textContent = "Kopieren";
+      copy.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(cmdText);
+          copy.textContent = "Kopiert ✓";
+        } catch {
+          // Ohne Clipboard-Recht: Befehl markieren, Cmd+C geht dann von Hand.
+          getSelection().selectAllChildren(code);
+          copy.textContent = "Markiert, Cmd+C";
+        }
+        setTimeout(() => { copy.textContent = "Kopieren"; }, 2500);
+      });
+      box.append(code, copy);
+      a.before(box);
+    }
   }
 
   const platformKeys = Object.keys(platforms);

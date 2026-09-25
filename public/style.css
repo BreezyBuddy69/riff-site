@@ -832,3 +832,135 @@ code { font-family: var(--mono); font-size: 0.92em; }
   }
   .reveal { opacity: 1; transform: none; }
 }
+
+/* ═══════════════ Riff am Handy (mobile.html, D41) ═══════════════
+   Ein Knopf, ein Textfeld, drei Aktionen. Der Knopf ist das Orb-Markenzeichen
+   der Seite in gross; der Ring darum zeigt live den Pegel (--level 0..1,
+   gesetzt von mobile.js). */
+.m-body {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(120% 60% at 50% 0%, #1b1316 0%, var(--canvas) 62%);
+}
+.m-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: max(16px, env(safe-area-inset-top)) 20px 8px;
+}
+.m-badge {
+  font-size: 13px;
+  color: var(--muted);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  padding: 4px 12px;
+}
+.m-main {
+  flex: 1;
+  width: min(560px, 100%);
+  margin: 0 auto;
+  padding: 24px 20px max(24px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+.m-mic {
+  position: relative;
+  width: 168px;
+  height: 168px;
+  margin-top: 4vh;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  background: radial-gradient(circle at 35% 30%, var(--glow-a), var(--accent-deep) 55%, #3a1a10 100%);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 20px 60px -20px rgba(217, 119, 87, 0.55);
+  transition: transform 150ms ease, filter 150ms ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.m-mic svg { width: 56px; height: 56px; position: relative; }
+.m-mic:active { transform: scale(0.96); }
+.m-mic:disabled { cursor: progress; }
+.m-meter {
+  position: absolute;
+  inset: -14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 138, 92, 0.6);
+  transform: scale(calc(1 + var(--level, 0) * 0.35));
+  opacity: 0;
+  transition: transform 80ms linear, opacity 200ms ease;
+}
+[data-state="listening"] .m-meter { opacity: 1; }
+[data-state="listening"] .m-mic { filter: brightness(1.12) saturate(1.1); }
+[data-state="thinking"] .m-mic { animation: m-pulse 1s ease-in-out infinite; }
+@keyframes m-pulse { 50% { transform: scale(0.94); opacity: 0.8; } }
+
+.m-status {
+  min-height: 2.9em;
+  max-width: 34ch;
+  text-align: center;
+  font-size: 16px;
+  color: var(--muted);
+}
+.m-status[data-tone="ok"] { color: var(--ok); }
+.m-status[data-tone="warn"] { color: var(--warn); }
+.m-status[data-tone="error"] { color: #ff6961; }
+
+.m-label { align-self: flex-start; font-size: 13px; color: var(--faint); }
+.m-out {
+  width: 100%;
+  min-height: 9em;
+  resize: vertical;
+  padding: 14px 16px;
+  font: inherit;
+  font-size: 17px;
+  color: var(--ink);
+  border-radius: var(--radius-lg);
+}
+.m-out:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.m-actions { display: flex; gap: 10px; width: 100%; }
+.m-actions .btn { flex: 1; justify-content: center; }
+.m-install {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  font-size: 15px;
+  color: var(--muted);
+}
+.m-install summary { cursor: pointer; color: var(--ink); }
+.m-install p { margin-top: 8px; }
+.m-fine { font-size: 13px; color: var(--faint); text-align: center; }
+
+/* Terminal-Befehl im Download-Bereich (Mac) */
+.cmd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 auto 14px;
+  max-width: 520px;
+  padding: 10px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.35);
+  text-align: left;
+}
+.success-delivery .cmd .btn { width: auto; flex: none; }
+.cmd code {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--ink);
+  user-select: all;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-state="thinking"] .m-mic { animation: none; }
+  .m-meter { transition: none; }
+}
