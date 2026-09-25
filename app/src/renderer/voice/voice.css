@@ -78,7 +78,7 @@ body {
   opacity: 0.85;
   transform: scaleY(0.12);
   transform-origin: center;
-  transition: transform 70ms linear, opacity 150ms ease;
+  transition: transform 90ms ease-out, opacity 150ms ease;
 }
 
 #pill[data-phase="idle"] .bar { opacity: 0.4; }

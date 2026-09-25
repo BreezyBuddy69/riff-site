@@ -10,13 +10,18 @@ const bars = Array.from(document.querySelectorAll('#bars .bar'));
 const confirmBtn = document.getElementById('confirmBtn');
 const cancelBtn = document.getElementById('cancelBtn');
 
-// Tonband-Prinzip (Nutzerwunsch): jeder Balken ist ein Pegel-Sample aus der
-// juengeren Vergangenheit statt einer kuenstlich gespiegelten Gewichtskurve
-// um einen einzelnen Momentanwert. Index 0 = aeltestes Sample (linker
-// Balken), letzter Index = neuestes (rechter Balken) - neue Pegel kommen
-// rechts rein und ruecken bei jedem Update eins nach links durch, wie Band
-// durch einen Tonkopf laeuft.
-let levelHistory = new Array(bars.length).fill(0);
+// Balken schwingen an Ort und Stelle mit der Lautstaerke hoch und runter
+// (Nutzerwunsch 2026-09-25: "nicht mehr nach links laufen, nur weich hoch und
+// runter, ganz normal") - ersetzt das fruehere Tonband-Prinzip, bei dem die
+// Pegel von rechts nach links durchwanderten. Die Mitte schlaegt weiter aus
+// als der Rand (Glockenform); jeder Balken wackelt mit eigenem Tempo leicht
+// mit, damit es lebendig aussieht, ohne dass eine Welle seitwaerts laeuft.
+const BAR_WEIGHT = bars.map((_, i) => {
+  const x = (i - (bars.length - 1) / 2) / ((bars.length - 1) / 2); // -1..1
+  return 0.4 + 0.6 * Math.cos((x * Math.PI) / 2);
+});
+const BAR_SPEED = bars.map((_, i) => 4 + ((i * 5) % 7) * 0.6); // rad/s, je Balken anders
+let smoothLevel = 0;
 
 let mediaStream = null;
 let audioContext = null;
@@ -49,19 +54,24 @@ function showLocalError(text) {
 
 // ---------- Level-Balken (Waveform) ----------
 function renderLevels() {
+  const t = performance.now() / 1000;
   bars.forEach((bar, i) => {
-    bar.style.transform = `scaleY(${Math.max(0.12, levelHistory[i])})`;
+    const wobble = smoothLevel ? 0.82 + 0.18 * Math.sin(t * BAR_SPEED[i] + i * 1.7) : 1;
+    bar.style.transform = `scaleY(${Math.max(0.12, smoothLevel * BAR_WEIGHT[i] * wobble)})`;
   });
 }
 
+// Weich statt zappelig: schnell hoch, wenn es lauter wird, langsamer wieder
+// runter (wie ein normaler Pegelmesser). Kommt alle ~32ms aus dem Worklet.
 function pushLevel(level) {
-  levelHistory.shift();
-  levelHistory.push(Math.max(0, Math.min(1, level * 4)));
+  const target = Math.max(0, Math.min(1, level * 4));
+  smoothLevel += (target - smoothLevel) * (target > smoothLevel ? 0.5 : 0.15);
+  if (smoothLevel < 0.01) smoothLevel = 0;
   renderLevels();
 }
 
 function resetLevels() {
-  levelHistory.fill(0);
+  smoothLevel = 0;
   renderLevels();
 }
 

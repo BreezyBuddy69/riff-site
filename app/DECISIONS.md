@@ -594,3 +594,11 @@ Stolperstein: electron-builder entpackt winCodeSign mit Symlinks (darwin-
 Dateien), das scheitert ohne Windows-Entwicklermodus - geloest durch einmal
 manuell entpacktes `%LOCALAPPDATA%\electron-builder\Cache\winCodeSign\
 winCodeSign-2.6.0`. SmartScreen-Warnung bleibt ohne Zertifikat.
+
+**2026-09-25 — Waveform: an Ort und Stelle statt Tonband.** Nutzerwunsch:
+die Balken sollen nicht mehr nach links durchlaufen, sondern "nur weich hoch
+und runter, ganz normal". `voice.js`: ein geglaetteter Pegel (schnell hoch,
+langsamer runter) skaliert alle Balken gleichzeitig, Glockenform (Mitte
+hoeher als Rand), jeder Balken wackelt mit eigenem Tempo leicht mit - ohne
+Phasenverschiebung ueber die Balken, also keine seitwaerts laufende Welle.
+Ersetzt das fruehere Tonband-Prinzip (`levelHistory`).
